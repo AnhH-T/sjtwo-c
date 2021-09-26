@@ -51,3 +51,27 @@ uint16_t adc__get_adc_value(adc_channel_e channel_num) {
 
   return result;
 }
+
+void adc__enable_burst_mode(adc_channel_e channel_num) {
+  const uint32_t channel_masks = 0xFF;
+  const uint32_t enable_burst_mode = (1 << 16);
+  const uint32_t start_conversion_mask = (7 << 24); // 3bits - B26:B25:B24
+
+  LPC_ADC->CR &= ~(channel_masks | start_conversion_mask);
+  LPC_ADC->CR |= (1 << channel_num); // Set burst mode for specified channel
+  LPC_ADC->CR |= enable_burst_mode;
+}
+
+uint16_t adc__get_channel_reading_with_burst_mode(uint8_t channel_number) {
+  const uint16_t twelve_bits = 0x0FFF;
+  uint16_t result = 0;
+  if ((ADC__CHANNEL_2 == channel_number) || (ADC__CHANNEL_4 == channel_number) || (ADC__CHANNEL_5 == channel_number))
+    result = (LPC_ADC->DR[channel_number] >> 4) & twelve_bits;
+
+  return result;
+}
+
+// uint16_t adc__get_channel_reading_with_burst_mode(uint8_t channel_number) {
+//   const uint16_t twelve_bits = 0x0FFF;
+//   return (LPC_ADC->DR[channel_number] >> 4) & twelve_bits;
+// }
