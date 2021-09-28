@@ -21,7 +21,7 @@ void ssp2_lab__init(uint32_t max_clock_mhz) {
   const uint32_t cpu_clock_mhz = clock__get_core_clock_hz() / (1000UL * 1000UL);
   // Keep incrementing divider until cpu clock can be divided to less than the max clock
   // max_clock_mhz / 2 is only there for logic analyzer so it works correctly suggested by lab manual
-  while (max_clock_mhz / 2 < (cpu_clock_mhz / divider) && divider <= 254) { 
+  while (max_clock_mhz / 2 <= (cpu_clock_mhz / divider) && divider <= 254) {
     divider += 2;
   }
 

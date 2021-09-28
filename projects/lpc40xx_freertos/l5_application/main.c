@@ -21,8 +21,9 @@ void configure_ssp2_pin() {
   gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2
   gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI
   gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO
-  gpio__construct_as_output(1, 10);                      // CS: Configuring direction as output
-  
+  // LPC_IOCON->P1_4 |= (4 << 0); Example of doing it manually instead of constructing
+  gpio__construct_as_output(1, 10); // CS: Configuring direction as output
+
   // Extra configs for logic analyzer trigger
   gpio_s trigger = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(trigger);
@@ -52,11 +53,6 @@ adesto_flash_id_s adesto_read_signature(void) {
 }
 
 void spi_task(void *p) {
-  const uint32_t spi_clock_mhz = 24;
-  ssp2_lab__init(spi_clock_mhz);
-
-  configure_ssp2_pin();
-
   while (1) {
     adesto_flash_id_s id = adesto_read_signature();
     // printf the members of the 'adesto_flash_id_s' struct
@@ -68,10 +64,6 @@ void spi_task(void *p) {
 }
 
 void spi_id_verification_task(void *p) {
-  const uint32_t spi_clock_mhz = 24;
-  ssp2_lab__init(spi_clock_mhz);
-
-  configure_ssp2_pin();
   while (1) {
     if (xSemaphoreTake(spi_bus_mutex, 1000)) {
       const adesto_flash_id_s id = adesto_read_signature();
@@ -90,6 +82,11 @@ void spi_id_verification_task(void *p) {
 }
 
 int main(void) {
+  // Initialization
+  const uint32_t spi_clock_mhz = 24;
+  ssp2_lab__init(spi_clock_mhz);
+  configure_ssp2_pin();
+
   spi_bus_mutex = xSemaphoreCreateMutex();
   // xTaskCreate(spi_task, "SPI Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(spi_id_verification_task, "SPI1 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
