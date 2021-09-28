@@ -1,69 +1,105 @@
 #include <stdio.h>
 
 #include "FreeRTOS.h"
-#include "adc.h"
 #include "board_io.h"
 #include "gpio.h"
 #include "lpc40xx.h"
-#include "math.h"
-#include "pwm1.h"
-#include "queue.h"
 #include "task.h"
 
-static QueueHandle_t adc_to_pwm_task_queue;
+#include "semphr.h"
+#include "ssp2_lab.h"
 
-void pwm_task(void *p) {
-  int adc_reading = 0;
-  // Setting frequency, preferably over 30 Hz. Under 30Hz you will notice it flicker
-  pwm1__init_single_edge(100);
+static SemaphoreHandle_t spi_bus_mutex;
 
-  // Locate a GPIO pin that a PWM channel will control
-  // Parameters: port, pin, function | note: GPIO__FUNCTION_1 is PWM function for P2.0 - P2.5
-  // Equivalent to manually setting IOCON of a pin
-  gpio__construct_with_function(2, 0, GPIO__FUNCTION_1);
+typedef struct {
+  uint8_t manufacturer_id;
+  uint8_t device_id_1;
+  uint8_t device_id_2;
+} adesto_flash_id_s;
 
-  // Continue to vary the duty cycle in the loop
+void configure_ssp2_pin() {
+  gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2
+  gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI
+  gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO
+  gpio__construct_as_output(1, 10);                      // CS: Configuring direction as output
+  
+  // Extra configs for logic analyzer trigger
+  gpio_s trigger = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN);
+  gpio__set_as_output(trigger);
+}
+
+// Implement Adesto flash memory CS signal as a GPIO driver
+void adesto_cs(void) {
+  LPC_GPIO1->PIN &= ~(1 << 10);
+  LPC_GPIO2->PIN &= ~(1 << 0); // For trigger
+}
+void adesto_ds(void) {
+  LPC_GPIO1->PIN |= (1 << 10);
+  LPC_GPIO2->PIN |= (1 << 0); // For trigger
+}
+
+adesto_flash_id_s adesto_read_signature(void) {
+  adesto_flash_id_s data = {0};
+  uint8_t gunk;
+  adesto_cs();
+  gunk = ssp2_lab__exchange_byte(0x9F); // Send 9F and takes the trash
+  data.manufacturer_id = ssp2_lab__exchange_byte(0x00);
+  data.device_id_1 = ssp2_lab__exchange_byte(0x00);
+  data.device_id_2 = ssp2_lab__exchange_byte(0x00);
+  adesto_ds();
+
+  return data;
+}
+
+void spi_task(void *p) {
+  const uint32_t spi_clock_mhz = 24;
+  ssp2_lab__init(spi_clock_mhz);
+
+  configure_ssp2_pin();
+
   while (1) {
-    if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) {
-      adc_reading = floor((100 * adc_reading / 4095));
-      fprintf(stderr, "adc_reading received from Queue: %d%% \n", adc_reading);
-      fprintf(stderr, "MR0: %ld, MR1: %ld \n", LPC_PWM1->MR0, LPC_PWM1->MR1);
-      pwm1__set_duty_cycle(PWM1__2_0, adc_reading);
+    adesto_flash_id_s id = adesto_read_signature();
+    // printf the members of the 'adesto_flash_id_s' struct
+    printf("Manufacture ID: %.2x\n", id.manufacturer_id);
+    printf("Device ID 1: %.2x\n", id.device_id_1);
+    printf("Device ID 2: %.2x\n", id.device_id_2);
+    vTaskDelay(500);
+  }
+}
+
+void spi_id_verification_task(void *p) {
+  const uint32_t spi_clock_mhz = 24;
+  ssp2_lab__init(spi_clock_mhz);
+
+  configure_ssp2_pin();
+  while (1) {
+    if (xSemaphoreTake(spi_bus_mutex, 1000)) {
+      const adesto_flash_id_s id = adesto_read_signature();
+      printf("%s - Manufacture ID: %.2x\n", pcTaskGetName(NULL), id.manufacturer_id);
+      printf("%s - Device ID 1: %.2x\n", pcTaskGetName(NULL), id.device_id_1);
+      printf("%s - Device ID 2: %.2x\n", pcTaskGetName(NULL), id.device_id_2);
+      xSemaphoreGive(spi_bus_mutex);
+      vTaskDelay(500);
+      // When we read a manufacturer ID we do not expect, we will kill this task
+      if (0x1F != id.manufacturer_id) {
+        fprintf(stderr, "Manufacturer ID read failure\n");
+        vTaskSuspend(NULL); // Kill this task
+      }
     }
   }
 }
 
-void adc_task(void *p) {
-  adc__initialize();
-
-  // Configure burst mode for channel 5
-  adc__enable_burst_mode(ADC__CHANNEL_5);
-
-  // Configure a pin, such as P1.31 with FUNC 011 to route this pin as ADC channel 5
-  LPC_IOCON->P1_31 &= ~(1 << 7); // Set pin to analog mode
-  gpio__construct_with_function(1, 31, GPIO__FUNCTION_3);
-
-  int adc_reading = 0;
-
-  while (1) {
-    adc_reading = adc__get_channel_reading_with_burst_mode(ADC__CHANNEL_5);
-    float voltage = ((float)adc_reading / (float)4095) * (float)3.3;
-    fprintf(stderr, "Sending Value to Queue: %d\n", adc_reading);
-    fprintf(stderr, "In Volts: %.2f V\n", (double)voltage);
-    xQueueSend(adc_to_pwm_task_queue, &adc_reading, 0);
-    vTaskDelay(100);
-  }
-}
-
 int main(void) {
-  adc_to_pwm_task_queue = xQueueCreate(10, sizeof(int));
-
-  xTaskCreate(pwm_task, "PWM Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-  xTaskCreate(adc_task, "ADC Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  spi_bus_mutex = xSemaphoreCreateMutex();
+  // xTaskCreate(spi_task, "SPI Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(spi_id_verification_task, "SPI1 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(spi_id_verification_task, "SPI2 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
 
   return 0;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
 
 // Original code of main.c
 
