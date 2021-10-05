@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "FreeRTOS.h"
 #include "board_io.h"
@@ -6,91 +8,154 @@
 #include "lpc40xx.h"
 #include "task.h"
 
-#include "semphr.h"
-#include "ssp2_lab.h"
+#include "uart_lab.h"
 
-static SemaphoreHandle_t spi_bus_mutex;
-
-typedef struct {
-  uint8_t manufacturer_id;
-  uint8_t device_id_1;
-  uint8_t device_id_2;
-} adesto_flash_id_s;
-
-void configure_ssp2_pin() {
-  gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2
-  gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI
-  gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO
-  // LPC_IOCON->P1_4 |= (4 << 0); Example of doing it manually instead of constructing
-  gpio__construct_as_output(1, 10); // CS: Configuring direction as output
-
-  // Extra configs for logic analyzer trigger
-  gpio_s trigger = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN);
-  gpio__set_as_output(trigger);
+void pin_init2() {
+  // using UART 2
+  LPC_IOCON->P2_8 &= ~(0b111 << 0); // reset IOCON
+  LPC_IOCON->P2_9 &= ~(0b111 << 0); // reset IOCON
+  LPC_IOCON->P2_8 |= (1 << 1);      // Initialize P2_8 to TXD (write) 
+  LPC_IOCON->P2_9 |= (1 << 1);      // Initialize P2_9 to RXD (read)
 }
 
-// Implement Adesto flash memory CS signal as a GPIO driver
-void adesto_cs(void) {
-  LPC_GPIO1->PIN &= ~(1 << 10);
-  LPC_GPIO2->PIN &= ~(1 << 0); // For trigger
-}
-void adesto_ds(void) {
-  LPC_GPIO1->PIN |= (1 << 10);
-  LPC_GPIO2->PIN |= (1 << 0); // For trigger
+void pin_init3() {
+  // using UART 3
+  LPC_IOCON->P4_28 &= ~(0b111 << 0); // reset IOCON
+  LPC_IOCON->P4_29 &= ~(0b111 << 0); // reset IOCON
+  LPC_IOCON->P4_28 |= (1 << 1);      // Initialize P2_8 to TXD (write)
+  LPC_IOCON->P4_29 |= (1 << 1);      // Initialize P2_9 to RXD (read)
 }
 
-adesto_flash_id_s adesto_read_signature(void) {
-  adesto_flash_id_s data = {0};
-  uint8_t gunk;
-  adesto_cs();
-  gunk = ssp2_lab__exchange_byte(0x9F); // Send 9F and takes the trash
-  data.manufacturer_id = ssp2_lab__exchange_byte(0x00);
-  data.device_id_1 = ssp2_lab__exchange_byte(0x00);
-  data.device_id_2 = ssp2_lab__exchange_byte(0x00);
-  adesto_ds();
-
-  return data;
-}
-
-void spi_task(void *p) {
+void uart_read_task(void *p) {
+  char input_byte = 'x';
+  printf("starting read task\n");
   while (1) {
-    adesto_flash_id_s id = adesto_read_signature();
-    // printf the members of the 'adesto_flash_id_s' struct
-    printf("Manufacture ID: %.2x\n", id.manufacturer_id);
-    printf("Device ID 1: %.2x\n", id.device_id_1);
-    printf("Device ID 2: %.2x\n", id.device_id_2);
+    // Using interrupt method
+    uart_lab__get_char_from_queue2(&input_byte, portMAX_DELAY);
+    printf("received data: %c\n", input_byte);
     vTaskDelay(500);
   }
 }
 
-void spi_id_verification_task(void *p) {
+void uart_write_task(void *p) {
+  printf("starting write task\n");
   while (1) {
-    if (xSemaphoreTake(spi_bus_mutex, 1000)) {
-      const adesto_flash_id_s id = adesto_read_signature();
-      printf("%s - Manufacture ID: %.2x\n", pcTaskGetName(NULL), id.manufacturer_id);
-      printf("%s - Device ID 1: %.2x\n", pcTaskGetName(NULL), id.device_id_1);
-      printf("%s - Device ID 2: %.2x\n", pcTaskGetName(NULL), id.device_id_2);
-      xSemaphoreGive(spi_bus_mutex);
-      vTaskDelay(500);
-      // When we read a manufacturer ID we do not expect, we will kill this task
-      if (0x1F != id.manufacturer_id) {
-        fprintf(stderr, "Manufacturer ID read failure\n");
-        vTaskSuspend(NULL); // Kill this task
-      }
+    // Use uart_lab__polled_put() function to send something
+    uart_lab__polled_put(UART_2, 't');
+    vTaskDelay(500);
+  }
+}
+
+// For part 3
+void uart_3_sender_task(void *p) {
+  char number_as_string[16] = {0};
+
+  while (true) {
+    const int number = 987654321;
+    sprintf(number_as_string, "%i", number);
+
+    // Send one char at a time to the other board including terminating NULL char
+    for (int i = 0; i <= strlen(number_as_string); i++) {
+      uart_lab__polled_put(UART_3, number_as_string[i]); // Only line modified
+      fprintf(stderr, "Sent from 3: %c\n", number_as_string[i]);
+    }
+
+    fprintf(stderr, "Sent: %i over UART3 to UART 2\n", number);
+    vTaskDelay(10000);
+  }
+}
+
+void uart_2_receiver_task(void *p) {
+  char number_as_string[16] = {0};
+  int counter = 0;
+
+  while (true) {
+    char byte = 0;
+    uart_lab__get_char_from_queue2(&byte, portMAX_DELAY);
+    fprintf(stderr, "Received from 3: %c\n", byte);
+
+    // This is the last char, so print the number
+    if ('\0' == byte) {
+      number_as_string[counter] = '\0';
+      counter = 0;
+      fprintf(stderr, "Received at UART 2 Receiver: %s\n", number_as_string);
+    }
+    // We have not yet received the NULL '\0' char, so buffer the data
+    else {
+      // Added code to read a char at a time
+      number_as_string[counter] = byte;
+      if (counter < 16)
+        counter++;
+    }
+  }
+}
+
+void uart_2_sender_task(void *p) {
+  vTaskDelay(5000);
+  char number_as_string[16] = {0};
+
+  while (true) {
+    const int number = 123456789;
+    sprintf(number_as_string, "%i", number);
+
+    // Send one char at a time to the other board including terminating NULL char
+    for (int i = 0; i <= strlen(number_as_string); i++) {
+      uart_lab__polled_put(UART_2, number_as_string[i]);
+      fprintf(stderr, "Sent from 2: %c\n", number_as_string[i]);
+    }
+
+    fprintf(stderr, "Sent: %i over UART2 to UART 3\n", number);
+    vTaskDelay(10000);
+  }
+}
+
+void uart_3_receiver_task(void *p) {
+  char number_as_string[16] = {0};
+  int counter = 0;
+
+  while (true) {
+    char byte = 0;
+    uart_lab__get_char_from_queue3(&byte, portMAX_DELAY);
+    fprintf(stderr, "Received from 2: %c\n", byte);
+
+    // This is the last char, so print the number
+    if ('\0' == byte) {
+      number_as_string[counter] = '\0';
+      counter = 0;
+      fprintf(stderr, "Received at UART 3 Receiver: %s\n", number_as_string);
+    }
+    // We have not yet received the NULL '\0' char, so buffer the data
+    else {
+      number_as_string[counter] = byte;
+      if (counter < 16)
+        counter++;
     }
   }
 }
 
 int main(void) {
   // Initialization
-  const uint32_t spi_clock_mhz = 24;
-  ssp2_lab__init(spi_clock_mhz);
-  configure_ssp2_pin();
+  const uint32_t peripheral_clock = 96 * 1000 * 1000;
+  const uint32_t baud_rate = 115200;
+  // Code below is for part 2
+  // pin_init2();
+  // uart_lab__init(UART_2, peripheral_clock, baud_rate);
+  // uart__enable_receive_interrupt(UART_2);
+  // xTaskCreate(uart_read_task, "UART Read", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  // xTaskCreate(uart_write_task, "UART Write", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  // vTaskStartScheduler();
 
-  spi_bus_mutex = xSemaphoreCreateMutex();
-  // xTaskCreate(spi_task, "SPI Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-  xTaskCreate(spi_id_verification_task, "SPI1 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-  xTaskCreate(spi_id_verification_task, "SPI2 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  // Code below is for part 3 UART 2 and UART 3 communication
+  pin_init2();
+  pin_init3();
+  uart_lab__init(UART_2, peripheral_clock, baud_rate);
+  uart_lab__init(UART_3, peripheral_clock, baud_rate);
+  uart__enable_receive_interrupt(UART_2);
+  uart__enable_receive_interrupt(UART_3);
+  xTaskCreate(uart_2_sender_task, "UART2 Write", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(uart_3_receiver_task, "UART3 Read", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(uart_3_sender_task, "UART3 Write", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(uart_2_receiver_task, "UART2 Read", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
 
   return 0;
@@ -122,7 +187,8 @@ int main(void) {
 
 //   // If you have the ESP32 wifi module soldered on the board, you can try uncommenting this code
 //   // See esp32/README.md for more details
-//   // uart3_init();                                                                     // Also include:  uart3_init.h
+//   // uart3_init();                                                                     // Also include:
+//   uart3_init.h
 //   // xTaskCreate(esp32_tcp_hello_world_task, "uart3", 1000, NULL, PRIORITY_LOW, NULL); // Include esp32_task.h
 
 //   puts("Starting RTOS");
