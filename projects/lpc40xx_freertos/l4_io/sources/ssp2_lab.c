@@ -1,3 +1,4 @@
+#include "clock.h"
 #include "lpc40xx.h"
 
 #include <stdint.h>
