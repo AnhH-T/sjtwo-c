@@ -1,18 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "FreeRTOS.h"
 #include "board_io.h"
 #include "gpio.h"
 #include "lpc40xx.h"
+#include "queue.h"
 #include "task.h"
 
+static QueueHandle_t switch_queue;
+
+typedef enum { switch__off, switch__on } switch_e;
+
+switch_e get_switch_input_from_switch0() {
+  // The switch I'm using is SW3 (Port 0 Pin 29)
+  switch_e sw_val;
+  if (LPC_GPIO0->PIN & (1 << 29))
+    sw_val = switch__on;
+  else
+    sw_val = switch__off;
+  return sw_val;
+}
+
+// TODO: Create this task at PRIORITY_LOW
+void producer(void *p) {
+  while (1) {
+    const switch_e switch_value = get_switch_input_from_switch0();
+
+    printf("Producer: Before sending\n");
+    xQueueSend(switch_queue, &switch_value, 0);
+    printf("Producer: After sending\n");
+
+    vTaskDelay(1000);
+  }
+}
+
+// TODO: Create this task at PRIORITY_HIGH
+void consumer(void *p) {
+  switch_e switch_value;
+  while (1) {
+    printf("Consumer: Before receiving\n");
+    xQueueReceive(switch_queue, &switch_value, portMAX_DELAY);
+    printf("Consumer: After receiving | switch_value = %d\n", switch_value);
+  }
+}
 
 int main(void) {
   // Initialization
+  gpio__construct_as_input(0, 29);
+  switch_queue = xQueueCreate(1, sizeof(switch_e));
 
-  xTaskCreate(randomtaskhere, "UART2 Read", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(producer, "Producer", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(consumer, "Consumer", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
 
   return 0;
