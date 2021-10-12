@@ -5,6 +5,43 @@
 #include "board_io.h"
 #include "gpio.h"
 #include "lpc40xx.h"
+#include "sj2_cli.h"
+#include "task.h"
+
+void task1(void *p) {
+  while (1) {
+    printf("Task 1 Running!!!\n");
+    vTaskDelay(1000);
+  }
+}
+
+void task2(void *p) {
+  while (1) {
+    vTaskDelay(1000);
+    printf("Task 2 Running!!!\n");
+  }
+}
+
+int main(void) {
+
+  sj2_cli__init();
+  xTaskCreate(task1, "t1", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(task2, "t2", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  vTaskStartScheduler();
+
+  return 0;
+}
+
+#if 0
+// -------------Code from producer consumer lab-------------------------------
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "FreeRTOS.h"
+#include "board_io.h"
+#include "gpio.h"
+#include "lpc40xx.h"
 #include "queue.h"
 #include "task.h"
 
@@ -22,26 +59,24 @@ switch_e get_switch_input_from_switch0() {
   return sw_val;
 }
 
-// TODO: Create this task at PRIORITY_LOW
-void producer(void *p) {
+void producer(void *p) { // Low prio
   while (1) {
     const switch_e switch_value = get_switch_input_from_switch0();
 
-    printf("Producer: Before sending\n");
+    printf("P: B4 Send\n");
     xQueueSend(switch_queue, &switch_value, 0);
-    printf("Producer: After sending\n");
+    printf("P: Af Send\n");
 
     vTaskDelay(1000);
   }
 }
 
-// TODO: Create this task at PRIORITY_HIGH
-void consumer(void *p) {
+void consumer(void *p) { // High prio
   switch_e switch_value;
   while (1) {
-    printf("Consumer: Before receiving\n");
+    printf("C: B4 Reci\n");
     xQueueReceive(switch_queue, &switch_value, portMAX_DELAY);
-    printf("Consumer: After receiving | switch_value = %d\n", switch_value);
+    printf("C: Af Reci = %d\n", switch_value);
   }
 }
 
@@ -50,12 +85,14 @@ int main(void) {
   gpio__construct_as_input(0, 29);
   switch_queue = xQueueCreate(1, sizeof(switch_e));
 
-  xTaskCreate(producer, "Producer", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(producer, "Producer", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   xTaskCreate(consumer, "Consumer", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
 
   return 0;
 }
+
+#endif
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
