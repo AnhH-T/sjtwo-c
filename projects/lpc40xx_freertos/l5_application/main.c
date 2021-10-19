@@ -1,98 +1,122 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "FreeRTOS.h"
+#include "acceleration.h"
 #include "board_io.h"
-#include "gpio.h"
-#include "lpc40xx.h"
+#include "event_groups.h"
+#include "ff.h"
+#include "queue.h"
 #include "sj2_cli.h"
 #include "task.h"
 
-void task1(void *p) {
-  while (1) {
-    printf("Task 1 Running!!!\n");
-    vTaskDelay(1000);
+#define BIT_1 (1 << 1)
+#define BIT_2 (1 << 2)
+
+void testWrite(int time[], int speed[], int arrSize) {
+  for (int i = 0; i < arrSize; i++)
+    printf("Time %d: %d, Speed %d: %d\n", i, time[i], i, speed[i]);
+}
+
+static QueueHandle_t sensor_queue;
+static EventGroupHandle_t xCreatedEventGroup;
+
+void write_file_using_fatfs_pi(int time[], int speed[], int arrSize) {
+  const char *filename = "sensor.txt";
+  FIL file; // File handle
+  UINT bytes_written = 0;
+  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_OPEN_APPEND));
+
+  if (FR_OK == result) {
+    char string[64];
+    for (int i = 0; i < arrSize; i++) {
+      sprintf(string, "%i, %i\n", time[i], speed[i]);
+      if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
+      } else {
+        printf("ERROR: Failed to write data to file\n");
+      }
+    }
+    f_close(&file);
+  } else {
+    printf("ERROR: Failed to open: %s\n", filename);
   }
 }
 
-void task2(void *p) {
+int get_sample_from_accel_z() {
+  acceleration__axis_data_s temp;
+  int average = 0;
+  for (int i = 0; i < 100; i++) {
+    temp = acceleration__get_data();
+    average += temp.z;
+  }
+  average = average / 100;
+  return average;
+}
+
+void producer(void *p) {
+  int sensor_sample;
   while (1) {
-    vTaskDelay(1000);
-    printf("Task 2 Running!!!\n");
+    sensor_sample = get_sample_from_accel_z();
+
+    if (xQueueSend(sensor_queue, &sensor_sample, 0)) {
+      ;
+    }
+
+    xEventGroupSetBits(xCreatedEventGroup, BIT_1);
+    vTaskDelay(100);
   }
 }
 
-int main(void) {
-
-  sj2_cli__init();
-  xTaskCreate(task1, "t1", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-  xTaskCreate(task2, "t2", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-  vTaskStartScheduler();
-
-  return 0;
-}
-
-#if 0
-// -------------Code from producer consumer lab-------------------------------
-
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "FreeRTOS.h"
-#include "board_io.h"
-#include "gpio.h"
-#include "lpc40xx.h"
-#include "queue.h"
-#include "task.h"
-
-static QueueHandle_t switch_queue;
-
-typedef enum { switch__off, switch__on } switch_e;
-
-switch_e get_switch_input_from_switch0() {
-  // The switch I'm using is SW3 (Port 0 Pin 29)
-  switch_e sw_val;
-  if (LPC_GPIO0->PIN & (1 << 29))
-    sw_val = switch__on;
-  else
-    sw_val = switch__off;
-  return sw_val;
-}
-
-void producer(void *p) { // Low prio
+void consumer(void *p) {
+  int avg_speed, time[10], speed[10];
+  int count = 0;
   while (1) {
-    const switch_e switch_value = get_switch_input_from_switch0();
+    xQueueReceive(sensor_queue, &avg_speed, portMAX_DELAY);
+    speed[count] = avg_speed;
+    time[count] = xTaskGetTickCount();
+    count++;
 
-    printf("P: B4 Send\n");
-    xQueueSend(switch_queue, &switch_value, 0);
-    printf("P: Af Send\n");
-
-    vTaskDelay(1000);
+    if (count == 10) { // only write every 1 second
+      count = 0;
+      write_file_using_fatfs_pi(time, speed, 10);
+      testWrite(time, speed, 10); // For seeing on telemetry
+    }
+    xEventGroupSetBits(xCreatedEventGroup, BIT_2);
   }
 }
 
-void consumer(void *p) { // High prio
-  switch_e switch_value;
+void watchdog_task(void *p) {
+  EventBits_t uxBits;
   while (1) {
-    printf("C: B4 Reci\n");
-    xQueueReceive(switch_queue, &switch_value, portMAX_DELAY);
-    printf("C: Af Reci = %d\n", switch_value);
+    // Check bit 1 and 2, clear it when function returns, wait for 200 ms max
+    uxBits = xEventGroupWaitBits(xCreatedEventGroup, 0x06, pdTRUE, pdTRUE, 200);
+    if ((uxBits & BIT_1) != 0) // Producer Check
+      fprintf(stderr, "WATCHDOG: Producer Check-in CONFIRM\n");
+    else
+      fprintf(stderr, "WATCHDOG: Producer Check-in FAILED\n");
+    if ((uxBits & BIT_2) != 0) // Consumer Check
+      fprintf(stderr, "WATCHDOG: Consumer Check-in CONFIRM\n");
+    else
+      fprintf(stderr, "WATCHDOG: Consumer Check-in FAILED\n");
+    vTaskDelay(1000);
   }
 }
 
 int main(void) {
   // Initialization
-  gpio__construct_as_input(0, 29);
-  switch_queue = xQueueCreate(1, sizeof(switch_e));
+  acceleration__init();
 
-  xTaskCreate(producer, "Producer", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-  xTaskCreate(consumer, "Consumer", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  sensor_queue = xQueueCreate(1, sizeof(int));
+  xCreatedEventGroup = xEventGroupCreate();
+  sj2_cli__init();
+  xTaskCreate(producer, "Producer", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(consumer, "Consumer", (512U * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(watchdog_task, "Watchdog", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   vTaskStartScheduler();
 
   return 0;
 }
-
-#endif
 
 // ---------------------------------------------------------------------------------------------------------------------------
 

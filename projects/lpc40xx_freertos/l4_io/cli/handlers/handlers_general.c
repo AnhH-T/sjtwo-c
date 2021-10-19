@@ -1,9 +1,38 @@
+#include "ff.h"
+#include <stdio.h>
+#include <string.h>
+
 #include "cli_handlers.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
 
 #include "uart_printf.h"
+
+// false = suspend, true = resume
+// Helper file write function
+static void write_file_using_fatfs_pi(char input[], bool type) {
+  const char *filename = "sensor.txt";
+  FIL file; // File handle
+  UINT bytes_written = 0;
+  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_OPEN_APPEND));
+
+  if (FR_OK == result) {
+    char string[64];
+    if (!type)
+      sprintf(string, "%s Suspended\n", input);
+    else
+      sprintf(string, "%s Resumed\n", input);
+
+    if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
+    } else {
+      printf("ERROR: Failed to write data to file\n");
+    }
+    f_close(&file);
+  } else {
+    printf("ERROR: Failed to open: %s\n", filename);
+  }
+}
 
 static void cli__task_list_print(sl_string_s user_input_minus_command_name, app_cli__print_string_function cli_output);
 
@@ -41,6 +70,7 @@ app_cli_status_e cli__task_control(app_cli__argument_t argument, sl_string_s use
       cli_output(NULL, s.cstring);
     } else {
       vTaskSuspend(task_handle);
+      write_file_using_fatfs_pi(s.cstring, false);
     }
 
   } else if (sl_string__begins_with_ignore_case(s, "resume")) {
@@ -53,6 +83,7 @@ app_cli_status_e cli__task_control(app_cli__argument_t argument, sl_string_s use
       cli_output(NULL, s.cstring);
     } else {
       vTaskResume(task_handle);
+      write_file_using_fatfs_pi(s.cstring, true);
     }
   } else {
     cli_output(NULL, "Did you mean to say suspend or resume?\n");
