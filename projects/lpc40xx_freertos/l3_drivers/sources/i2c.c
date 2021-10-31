@@ -8,6 +8,8 @@
 #include "lpc40xx.h"
 #include "lpc_peripherals.h"
 
+#include "i2c_slave_functions.h"
+
 /// Set to non-zero to enable debugging, and then you can use I2C__DEBUG_PRINTF()
 #define I2C__ENABLE_DEBUGGING 0
 
@@ -44,6 +46,10 @@ typedef struct {
   uint8_t *input_byte_pointer;        ///< Used for reading I2C slave device
   const uint8_t *output_byte_pointer; ///< Used for writing data to the I2C slave device
   size_t number_of_bytes_to_transfer;
+
+  bool expecting_slave_register_number;
+  uint8_t slave_register_number;
+
 } i2c_s;
 
 /// Instances of structs for each I2C peripheral
@@ -276,6 +282,16 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     I2C__STATE_MR_SLAVE_READ_NACK = 0x48,
     I2C__STATE_MR_SLAVE_ACK_SENT = 0x50,
     I2C__STATE_MR_SLAVE_NACK_SENT = 0x58,
+
+    // Slave Transmitter States (ST):
+    I2C__STATE_ST_MASTER_ADDRESS_ACK = 0xA8,
+    I2C__STATE_ST_MASTER_DATA_ACK = 0xB8,
+    I2C__STATE_ST_MASTER_DATA_NACK = 0xC0,
+
+    // Slave Receiver States (SR):
+    I2C__STATE_SR_MASTER_ADDRESS_ACK = 0x60,
+    I2C__STATE_SR_MASTER_DATA_ACK = 0x80,
+    I2C__STATE_SR_MASTER_REPEAT_ACK = 0xA0,
   };
 
   bool stop_sent = false;
@@ -298,6 +314,49 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
   I2C__DEBUG_PRINTF("  HW State: 0x%02X", i2c_state);
 
   switch (i2c_state) {
+  // Slave Receiver States:
+  case I2C__STATE_SR_MASTER_ADDRESS_ACK: // 0x60
+    i2c__set_ack_flag(lpc_i2c);          // Send ACK in the future
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    i2c->expecting_slave_register_number = true;
+    break;
+
+  case I2C__STATE_SR_MASTER_DATA_ACK:                   // 0x80
+    if (i2c->expecting_slave_register_number) {         // first data we get is slave register number
+      i2c->expecting_slave_register_number = false;     // once we get it, set to false so it doesn't do this again
+      i2c->slave_register_number = i2c->registers->DAT; // set slave_register_number to the current data on the line
+    } else {
+      i2c_slave_callback__write_memory(i2c->slave_register_number, i2c->registers->DAT);
+      ++(i2c->slave_register_number);
+    }
+    i2c__set_ack_flag(lpc_i2c); // Send ACK in the future
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+
+  case I2C__STATE_SR_MASTER_REPEAT_ACK:
+    i2c__set_ack_flag(lpc_i2c); // Send ACK in the future
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+
+  // Slave Transmiter States:
+  case I2C__STATE_ST_MASTER_ADDRESS_ACK: // 0xA8
+    i2c_slave_callback__read_memory(i2c->slave_register_number, &i2c->registers->DAT);
+    i2c__set_ack_flag(lpc_i2c); // Send ACK in the future
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+
+  case I2C__STATE_ST_MASTER_DATA_NACK: // 0xC0
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    i2c__set_ack_flag(lpc_i2c);
+    break;
+
+  case I2C__STATE_ST_MASTER_DATA_ACK: // 0xB8
+    i2c_slave_callback__read_memory(i2c->slave_register_number, &i2c->registers->DAT);
+    ++(i2c->slave_register_number);
+    i2c__set_ack_flag(lpc_i2c);
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+
   // Start condition sent, so send the device address
   case I2C__STATE_START:
     lpc_i2c->DAT = i2c__write_address(i2c->slave_address);
