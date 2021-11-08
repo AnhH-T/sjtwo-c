@@ -164,7 +164,7 @@ app_cli_status_e cli__mp3_play(app_cli__argument_t argument, sl_string_s user_in
   if (sl_string__begins_with_ignore_case(s, "play")) {
     sl_string__erase_first_word(s, ' ');
     xQueueSend(Q_songname, user_input_minus_command_name.cstring, portMAX_DELAY);
-    printf("Sent %s over to the Q_songname\n", user_input_minus_command_name);
+    printf("\nSent %s over to the Q_songname\n", user_input_minus_command_name);
   } else { // if incorrect task name
     cli_output(NULL, "Wrong CLI task call name.\n");
   }
