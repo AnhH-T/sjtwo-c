@@ -9,6 +9,7 @@
 #include "periodic_scheduler.h"
 #include "sj2_cli.h"
 
+#include "ff.h"
 #include "i2c.h"
 #include "i2c_slave_functions.h"
 #include "i2c_slave_init.h"
@@ -16,58 +17,58 @@
 QueueHandle_t Q_songname;
 QueueHandle_t Q_songdata;
 
-struct {
+typedef struct {
   char song_Name[512];
-} songName_t;
+} songName_s;
 
-struct {
-  uint32_t song_Bytes;
-} songBytes_t;
+typedef struct {
+  uint8_t byte;
+} buffer_s;
 
-void open_file_and_send_song_data_bytes() {
-  songBytes_t bytes_to_send;
-  songName_t songName;
-  FIL file; // File handle
-  f_open(&file);
-  while (!file.end()) {
-    read_from_file(bytes_512);
-    xQueueSend(Q_songdata, &bytes_to_send.song_Bytes, portMAX_DELAY);
-  }
-  close_file();
+static void open_file_and_send_song_data_bytes(songName_s *name) {
+  buffer_s byte_recieve;
+  FIL file;
+  UINT br; /* File read/write count */
+  FRESULT result;
+
+  result = f_open(&file, name->song_Name, FA_READ);
+  if (FR_OK == result) {
+    result = f_read(&file, &byte_recieve.byte, sizeof(buffer_s), &br);
+    if (FR_OK == result) {
+      xQueueSend(Q_songdata, &byte_recieve.byte, portMAX_DELAY);
+    } else
+      printf("Couldnt read anything");
+  } else
+    printf("File cannot be opened");
 }
 
 void mp3_reader_task(void *p) {
-  Q_songname name;
+  songName_s name;
   while (1) {
-    xQueueReceive(Q_songname, &name, portMAX_DELAY);
-    printf("Received song to play: %s\n", name);
-    open_file_and_send_song_data_bytes();
+    xQueueReceive(Q_songname, name.song_Name, portMAX_DELAY);
+    printf("Received song to play: %s\n", name.song_Name);
+    open_file_and_send_song_data_bytes(&name);
   }
 }
 
 // Player task receives song data over Q_songdata to send it to the MP3 decoder
 void mp3_player_task(void *p) {
-  char bytes_512[512];
-
+  uint8_t byte_recieved;
   while (1) {
-    xQueueReceive(Q_songdata, &bytes_512[0], portMAX_DELAY);
-    for (int i = 0; i < sizeof(bytes_512); i++) {
-      while (!mp3_decoder_needs_data()) {
-        vTaskDelay(1);
-      }
-
-      spi_send_to_mp3_decoder(bytes_512[i]);
-    }
+    xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
+    printf("Song data byte read: %i\n", byte_recieved);
   }
 }
 
 int main(void) {
   sj2_cli__init();
+  Q_songname = xQueueCreate(1, sizeof(songName_s));
+  Q_songdata = xQueueCreate(1, sizeof(buffer_s));
+  xTaskCreate(mp3_reader_task, "Mp3_Reader_Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(mp3_player_task, "Mp3_Player_Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
   return 0;
 }
-
-//----------------------------------------------------------
 
 static volatile uint8_t slave_memory[256];
 bool i2c_slave_callback__read_memory(uint8_t memory_index, uint8_t *memory) {
