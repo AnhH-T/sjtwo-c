@@ -1,67 +1,80 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
 
 #include "board_io.h"
 #include "common_macros.h"
+#include "ff.h"
 #include "gpio.h"
 #include "periodic_scheduler.h"
+#include "queue.h"
 #include "sj2_cli.h"
 
-#include "i2c.h"
-#include "i2c_slave_functions.h"
-#include "i2c_slave_init.h"
-static gpio_s led[4] = {{2, 3}, {1, 26}, {1, 24}, {1, 18}};
+#include "songname.h"
 
-static volatile uint8_t slave_memory[256];
-bool i2c_slave_callback__read_memory(uint8_t memory_index, uint8_t *memory) {
-  if (memory_index > 255)
-    return false;
-  else
-    *memory = slave_memory[memory_index];
-  return true;
-}
+typedef struct {
+  char data[512];
+} songdata_s;
 
-bool i2c_slave_callback__write_memory(uint8_t memory_index, uint8_t memory_value) {
-  if (memory_index > 255)
-    return false;
-  else
-    slave_memory[memory_index] = memory_value;
-  return true;
-}
+QueueHandle_t Q_songname;
+QueueHandle_t Q_songdata;
 
-static void ledtest() {
-  while (true) {
-    if (slave_memory[105] == 69) {
-      for (int j = 3; j >= 0; j--) {
-        gpio__reset(led[j]); // Set pin Low
-        vTaskDelay(200);
-      }
-    } else {
-      for (int j = 3; j >= 0; j--) {
-        gpio__set(led[j]); // Set pin High
-        vTaskDelay(200);
-      }
-    }
+static void read_loop(FIL *file) {
+  songdata_s buffer;
+  UINT br = 1;
+  FRESULT result;
+  while ((br != 0) && (uxQueueMessagesWaiting(Q_songname) == 0)) {
+    result = f_read(file, &buffer.data, sizeof(songdata_s), &br);
+    if (FR_OK == result) {
+      xQueueSend(Q_songdata, &buffer, portMAX_DELAY);
+      printf("Sent [%d] bytes onto the queue\n", br);
+    } else
+      printf("File Read Error!");
   }
 }
 
-static void init_gpio_stuff() {
-  for (int i = 0; i < 4; i++)
-    gpio__set_as_output(led[i]);
+static void read_mp3_file(songname_s song) {
+  const char *filename = song.name;
+  FIL file; // File handle
+  FRESULT result = f_open(&file, filename, FA_READ);
+
+  if (FR_OK == result) {
+    read_loop(&file);
+  } else {
+    printf("ERROR: Failed to open: %s\n", filename);
+  }
+
+  f_close(&file);
+}
+
+void mp3_reader_task(void *p) {
+  songname_s song;
+  while (1) {
+    xQueueReceive(Q_songname, &song, portMAX_DELAY);
+    vTaskDelay(1000);
+    printf("Requested song [%s] has been received\n", song.name);
+    read_mp3_file(song);
+  }
+}
+
+void mp3_player_task(void *p) {
+  songdata_s bytes_512;
+  int count = 1;
+  while (1) {
+    xQueueReceive(Q_songdata, &bytes_512, portMAX_DELAY);
+    // printf("%d: Received [%d] Bytes from Queue\n", count++, sizeof(bytes_512.data));
+  }
 }
 
 int main(void) {
+  Q_songdata = xQueueCreate(3, sizeof(songdata_s));
+  Q_songname = xQueueCreate(1, sizeof(songname_s));
+
   sj2_cli__init();
-  i2c1__slave_init(0x22);
-  for (unsigned slave_address = 2; slave_address <= 254; slave_address += 2) {
-    if (i2c__detect(I2C__2, slave_address)) {
-      printf("I2C slave detected at address: 0x%02X\n", slave_address);
-    }
-  }
-  init_gpio_stuff();
-  xTaskCreate(ledtest, "led", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
