@@ -54,7 +54,7 @@ static void init_gpio_stuff() {
 
 int main(void) {
   sj2_cli__init();
-  i2c1__slave_init(0x68);
+  i2c1__slave_init(0x22);
   for (unsigned slave_address = 2; slave_address <= 254; slave_address += 2) {
     if (i2c__detect(I2C__2, slave_address)) {
       printf("I2C slave detected at address: 0x%02X\n", slave_address);

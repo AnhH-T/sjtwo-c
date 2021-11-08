@@ -48,7 +48,9 @@ static void cli__i2c_read(const sl_string_s command_params, app_cli__print_strin
       cli_output(unused_cli_argument, sl_string__c_str(output));
 
       for (size_t index = 0; index < count; index++) {
-        sl_string__printf(output, "  0x%02X: 0x%02X (%d)\n", (slave_register + index), buffer[index], buffer[index]);
+        // Changed this for loopback print [for i2c lab]
+        sl_string__printf(output, "  0x%02X: 0x%02X (%d)\n", ((slave_register + index) % 256), buffer[index],
+                          buffer[index]);
         cli_output(unused_cli_argument, sl_string__c_str(output));
       }
     } else {
@@ -87,8 +89,9 @@ static void cli__i2c_write(sl_string_s command_params, app_cli__print_string_fun
       cli_output(unused_cli_argument, sl_string__c_str(output));
 
       for (size_t index = 0; index < count; index++) {
-        sl_string__printf(output, "  [%3d] [0x%02X] = 0x%02X (%d)\n", (slave_register + index),
-                          (slave_register + index), buffer[index], buffer[index]);
+        // Changed this for loopback print [for i2c lab]
+        sl_string__printf(output, "  [%3d] [0x%02X] = 0x%02X (%d)\n", ((slave_register + index) % 256),
+                          ((slave_register + index) % 256), buffer[index], buffer[index]);
         cli_output(unused_cli_argument, sl_string__c_str(output));
       }
     } else {
