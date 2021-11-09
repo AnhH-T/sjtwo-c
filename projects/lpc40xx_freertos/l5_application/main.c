@@ -30,14 +30,16 @@ static void open_file_and_send_song_data_bytes(songName_s *name) {
   FIL file;
   UINT br; /* File read/write count */
   FRESULT result;
+  // char temp_byte;
 
   result = f_open(&file, name->song_Name, FA_READ);
   if (FR_OK == result) {
     do {
       result = f_read(&file, &byte_recieve.byte, sizeof(buffer_s), &br);
-      if (FR_OK == result)
+      if (FR_OK == result) {
         xQueueSend(Q_songdata, &byte_recieve.byte, portMAX_DELAY);
-      else
+        printf("Sent song byte\n");
+      } else
         printf("Couldnt read anything");
     } while (br != 0);
   } else
@@ -48,7 +50,7 @@ void mp3_reader_task(void *p) {
   songName_s name;
   while (1) {
     xQueueReceive(Q_songname, name.song_Name, portMAX_DELAY);
-    printf("\nReceived song to play: %s\n", name.song_Name);
+    printf("\nReceived song: %s\n", name.song_Name);
     open_file_and_send_song_data_bytes(&name);
   }
 }
@@ -56,10 +58,12 @@ void mp3_reader_task(void *p) {
 // Player task receives song data over Q_songdata to send it to the MP3 decoder
 void mp3_player_task(void *p) {
   char byte_recieved[512];
+  char temp_byte; // single bute
   while (1) {
+    // xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
     xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
-    printf("\nSong data byte has been recieved\n");
-    //send data to the mp3 decoder
+    printf("\nSong byte recieved\n");
+    // send data to the mp3 decoder
   }
 }
 
