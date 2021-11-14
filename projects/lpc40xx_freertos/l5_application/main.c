@@ -25,6 +25,7 @@ typedef struct {
   char byte[512];
 } buffer_s;
 
+
 static void open_file_and_send_song_data_bytes(songName_s *name) {
   buffer_s byte_recieve;
   FIL file;
