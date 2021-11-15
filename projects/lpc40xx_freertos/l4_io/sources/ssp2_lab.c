@@ -35,5 +35,14 @@ uint8_t ssp2_lab__exchange_byte(uint8_t data_out) {
   while (LPC_SSP2->SR & (1 << 4)) {
     // do nothing until it's ready
   }
-  return (uint8_t)(LPC_SSP2->DR & 0xFF); // Mask everything but the 8 bits we want
+  return (uint8_t)(LPC_SSP2->DR & 0xFF); // Mask everything but the 8 bits we want, 21.6
+}
+
+void ssp2_lab__exchange_song_byte(song_data_s data_out) {
+  // Configure the Data register(DR) to send and receive data by checking the SPI peripheral status register
+  LPC_SSP2->DR = data_out;
+  while (LPC_SSP2->SR & (1 << 4)) {
+    // do nothing until it's ready
+  }
+  
 }

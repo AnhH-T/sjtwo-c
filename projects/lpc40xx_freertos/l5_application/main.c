@@ -23,10 +23,6 @@ typedef struct {
   char song_Name[512];
 } songName_s;
 
-typedef struct {
-  char byte[512];
-} song_data_s;
-
 static void open_file_and_send_song_data_bytes(songName_s *name) {
   song_data_s byte_recieve;
   FIL file;
@@ -57,7 +53,6 @@ void mp3_reader_task(void *p) {
   }
 }
 
-
 //-----------------------------MILE STONE 2----------------------------------
 // Player task receives song data over Q_songdata to send it to the MP3 decoder
 typedef struct {
@@ -67,24 +62,20 @@ typedef struct {
   song_data_s *song_data;
 } decoder_s;
 
-void mp3_cs(void) {
-  LPC_GPIO2->PIN &= ~(1 << 0);
-}
-void mp3_ds(void) {
-  LPC_GPIO2->PIN |= (1 << 0);
-}
+void mp3_cs(void) { LPC_GPIO2->PIN &= ~(1 << 0); }
+void mp3_ds(void) { LPC_GPIO2->PIN |= (1 << 0); }
 
-static void send_song_data_byte_to_mp3_decoder(song_data_s byte_recieved){
-//DREQ is low, the register will update
-//DREQ is high, incoming change
+static void send_song_data_byte_to_mp3_decoder(song_data_s byte_recieved) {
+  // DREQ is low, the register will update
+  // DREQ is high, incoming change
   decoder_s d;
-  uint8_t dummy_bits = 0xFF;
   uint8_t read_instruction = 0x3; // ch 7.4
-  uint8_t audio_data_address = 0x5;
-  mp3_cs();
-  d.opcode_read = ssp2_lab__exchange_byte(read_instruction); //send the read opcode instruction
-  d.address = ssp2_lab__exchange_byte(audio_data_address);
+  uint8_t ram_read_or_write_address = 0x6;
 
+  mp3_cs();
+  d.opcode_read = ssp2_lab__exchange_byte(read_instruction); // send the read opcode instruction
+  d.address = ssp2_lab__exchange_byte(ram_read_or_write_address);
+  ssp2_lab__exchange_song_byte(byte_recieved);
   mp3_ds();
 }
 
@@ -95,7 +86,7 @@ void mp3_player_task(void *p) {
     // xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
     xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
     // printf("\nSong byte recieved\n");
-    //send_song_data_byte_to_mp3_decoder(&byte_recieved);
+    send_song_data_byte_to_mp3_decoder(byte_recieved);
   }
 }
 
