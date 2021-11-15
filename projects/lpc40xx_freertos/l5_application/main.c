@@ -6,71 +6,76 @@
 #include "task.h"
 #include "semphr.h"
 #include "ssp2_lab.h"
+
 static SemaphoreHandle_t spi_bus_mutex;
+
 typedef struct {
- uint8_t manufacturer_id;
- uint8_t device_id_1;
- uint8_t device_id_2;
+  uint8_t manufacturer_id;
+  uint8_t device_id_1;
+  uint8_t device_id_2;
 } adesto_flash_id_s;
+
 void configure_ssp2_pin() {
- gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2
- gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI
- gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO
- gpio__construct_as_output(1, 10); // CS: Configuring direction as output
+  gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2
+  gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI
+  gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO
+  gpio__construct_as_output(1, 10); // CS: Configuring direction as output
 }
+
 // Implement Adesto flash memory CS signal as a GPIO driver
 void adesto_cs(void) { LPC_GPIO1->PIN &= ~(1 << 10); }
 void adesto_ds(void) { LPC_GPIO1->PIN |= (1 << 10); }
+
 adesto_flash_id_s adesto_read_signature(void) {
- adesto_flash_id_s data = {0};
- uint8_t gunk;
- adesto_cs();
- gunk = ssp2_lab__exchange_byte(0x9F); // Send 9F and takes the trash
- data.manufacturer_id = ssp2_lab__exchange_byte(0x00);
- data.device_id_1 = ssp2_lab__exchange_byte(0x00);
- data.device_id_2 = ssp2_lab__exchange_byte(0x00);
- adesto_ds();
- return data;
+  adesto_flash_id_s data = {0};
+  uint8_t gunk;
+  adesto_cs();
+  gunk = ssp2_lab__exchange_byte(0x9F); // Send 9F and takes the trash
+  data.manufacturer_id = ssp2_lab__exchange_byte(0x00);
+  data.device_id_1 = ssp2_lab__exchange_byte(0x00);
+  data.device_id_2 = ssp2_lab__exchange_byte(0x00);
+  adesto_ds();
+  return data;
 }
 void spi_task(void *p) {
- const uint32_t spi_clock_mhz = 24;
- ssp2_lab__init(spi_clock_mhz);
- configure_ssp2_pin();
- while (1) {
- adesto_flash_id_s id = adesto_read_signature();
- // printf the members of the 'adesto_flash_id_s' struct
- printf("Manufacture ID: %.2x\n", id.manufacturer_id);
- printf("Device ID 1: %.2x\n", id.device_id_1);
- printf("Device ID 2: %.2x\n", id.device_id_2);
- vTaskDelay(500);
- }
+  const uint32_t spi_clock_mhz = 24;
+  ssp2_lab__init(spi_clock_mhz);
+  configure_ssp2_pin();
+  while (1) {
+    adesto_flash_id_s id = adesto_read_signature();
+    // printf the members of the 'adesto_flash_id_s' struct
+    printf("Manufacture ID: %.2x\n", id.manufacturer_id);
+    printf("Device ID 1: %.2x\n", id.device_id_1);
+    printf("Device ID 2: %.2x\n", id.device_id_2);
+    vTaskDelay(500);
+  }
 }
 void spi_id_verification_task(void *p) {
- const uint32_t spi_clock_mhz = 24;
- ssp2_lab__init(spi_clock_mhz);
- configure_ssp2_pin();
- while (1) {
- if (xSemaphoreTake(spi_bus_mutex, 1000)) {
- const adesto_flash_id_s id = adesto_read_signature();
- printf("%s - Manufacture ID: %.2x\n", pcTaskGetName(NULL), id.manufacturer_id);
- printf("%s - Device ID 1: %.2x\n", pcTaskGetName(NULL), id.device_id_1);
- printf("%s - Device ID 2: %.2x\n", pcTaskGetName(NULL), id.device_id_2);
- xSemaphoreGive(spi_bus_mutex);
- vTaskDelay(500);
- // When we read a manufacturer ID we do not expect, we will kill this task
- if (0x1F != id.manufacturer_id) {
- fprintf(stderr, "Manufacturer ID read failure\n");
- vTaskSuspend(NULL); // Kill this task
- }
- }
- }
+  const uint32_t spi_clock_mhz = 24;
+  ssp2_lab__init(spi_clock_mhz);
+  configure_ssp2_pin();
+  while (1) {
+    if (xSemaphoreTake(spi_bus_mutex, 1000)) {
+      const adesto_flash_id_s id = adesto_read_signature();
+      printf("%s - Manufacture ID: %.2x\n", pcTaskGetName(NULL), id.manufacturer_id);
+      printf("%s - Device ID 1: %.2x\n", pcTaskGetName(NULL), id.device_id_1);
+      printf("%s - Device ID 2: %.2x\n", pcTaskGetName(NULL), id.device_id_2);
+      xSemaphoreGive(spi_bus_mutex);
+      vTaskDelay(500);
+      // When we read a manufacturer ID we do not expect, we will kill this task
+      if (0x1F != id.manufacturer_id) {
+        fprintf(stderr, "Manufacturer ID read failure\n");
+        vTaskSuspend(NULL); // Kill this task
+      }
+    }
+  }
 }
 int main(void) {
- spi_bus_mutex = xSemaphoreCreateMutex();
- // xTaskCreate(spi_task, "SPI Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
- xTaskCreate(spi_id_verification_task, "SPI1 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
- xTaskCreate(spi_id_verification_task, "SPI2 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
- vTaskStartScheduler();
+  spi_bus_mutex = xSemaphoreCreateMutex();
+  // xTaskCreate(spi_task, "SPI Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(spi_id_verification_task, "SPI1 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(spi_id_verification_task, "SPI2 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  vTaskStartScheduler();
  return 0;
 }
 
