@@ -7,6 +7,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "songname.h"
 #include "uart_printf.h"
 
 // false = suspend, true = resume
@@ -87,6 +88,24 @@ app_cli_status_e cli__task_control(app_cli__argument_t argument, sl_string_s use
     }
   } else {
     cli_output(NULL, "Did you mean to say suspend or resume?\n");
+  }
+
+  return APP_CLI_STATUS__SUCCESS;
+}
+extern QueueHandle_t Q_songname;
+app_cli_status_e cli__mp3(app_cli__argument_t argument, sl_string_s user_input_minus_command_name,
+                          app_cli__print_string_function cli_output) {
+  sl_string_s s = user_input_minus_command_name;
+
+  if (sl_string__begins_with_ignore_case(s, "play")) {
+    sl_string__erase_first_word(s, ' ');
+    songname_s *song = s.cstring;
+    xQueueSend(Q_songname, song, portMAX_DELAY);
+    sl_string__insert_at(s, 0, "Song name inserted into Queue: ");
+    cli_output(NULL, s.cstring);
+
+  } else {
+    cli_output(NULL, "Did you mean to say play?\n");
   }
 
   return APP_CLI_STATUS__SUCCESS;
