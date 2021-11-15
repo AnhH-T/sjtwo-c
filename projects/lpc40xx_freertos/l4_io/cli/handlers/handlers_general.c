@@ -97,8 +97,6 @@ app_cli_status_e cli__mp3(app_cli__argument_t argument, sl_string_s user_input_m
                           app_cli__print_string_function cli_output) {
   sl_string_s s = user_input_minus_command_name;
 
-  // If the user types 'taskcontrol suspend led0' then we need to suspend a task with the name of 'led0'
-  // In this case, the user_input_minus_command_name will be set to 'suspend led0' with the command-name removed
   if (sl_string__begins_with_ignore_case(s, "play")) {
     sl_string__erase_first_word(s, ' ');
     songname_s *song = s.cstring;

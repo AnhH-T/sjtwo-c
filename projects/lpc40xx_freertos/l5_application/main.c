@@ -29,7 +29,7 @@ static void read_loop(FIL *file) {
     result = f_read(file, &buffer.data, sizeof(songdata_s), &br);
     if (FR_OK == result) {
       xQueueSend(Q_songdata, &buffer, portMAX_DELAY);
-      printf("Sent [%d] bytes onto the queue\n", br);
+      // printf("Sent [%d] bytes onto the queue\n", br);
     } else
       printf("File Read Error!");
   }
@@ -61,15 +61,18 @@ void mp3_reader_task(void *p) {
 
 void mp3_player_task(void *p) {
   songdata_s bytes_512;
-  int count = 1;
   while (1) {
     xQueueReceive(Q_songdata, &bytes_512, portMAX_DELAY);
+    for (int i = 0; i < 512; i++) {
+      fprintf(stderr, "%X ", bytes_512.data[i]);
+    }
+    fprintf(stderr, "\n");
     // printf("%d: Received [%d] Bytes from Queue\n", count++, sizeof(bytes_512.data));
   }
 }
 
 int main(void) {
-  Q_songdata = xQueueCreate(3, sizeof(songdata_s));
+  Q_songdata = xQueueCreate(5, sizeof(songdata_s));
   Q_songname = xQueueCreate(1, sizeof(songname_s));
 
   sj2_cli__init();
