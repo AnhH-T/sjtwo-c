@@ -100,9 +100,9 @@ void uart_lab__init(uart_number_e uart, uint32_t peripheral_clock, uint32_t baud
   if (uart == UART_2) {
     LPC_UART2->LCR |= (3 << 0); // set 8 bit transfer
     LPC_UART2->LCR |= DLAB;     // DLAB = 1 to access DLM/DLL registers
-    LPC_UART2->DLM = dlm; // Shares memory with RBR & THR
-    LPC_UART2->DLL = dll; // Shares memory with IER
-    LPC_UART2->LCR &= ~DLAB; // DLAB = 0 for RBR/THR usage
+    LPC_UART2->DLM = dlm;       // Shares memory with RBR & THR
+    LPC_UART2->DLL = dll;       // Shares memory with IER
+    LPC_UART2->LCR &= ~DLAB;    // DLAB = 0 for RBR/THR usage
     // LPC_UART2->FDR |= (1 << 4); already preset
   } else if (uart == UART_3) {
     LPC_UART3->LCR |= (3 << 0); // set 8 bit transfer

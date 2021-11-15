@@ -1,11 +1,11 @@
-#include <stdio.h>
 #include "FreeRTOS.h"
 #include "board_io.h"
 #include "gpio.h"
 #include "lpc40xx.h"
-#include "task.h"
 #include "semphr.h"
 #include "ssp2_lab.h"
+#include "task.h"
+#include <stdio.h>
 
 static SemaphoreHandle_t spi_bus_mutex;
 
@@ -19,7 +19,7 @@ void configure_ssp2_pin() {
   gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2
   gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI
   gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO
-  gpio__construct_as_output(1, 10); // CS: Configuring direction as output
+  gpio__construct_as_output(1, 10);                      // CS: Configuring direction as output
 }
 
 // Implement Adesto flash memory CS signal as a GPIO driver
@@ -76,9 +76,8 @@ int main(void) {
   xTaskCreate(spi_id_verification_task, "SPI1 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(spi_id_verification_task, "SPI2 Task", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
- return 0;
+  return 0;
 }
-
 
 // ---------------------------------------------------------------------------------------------------------------------------
 
