@@ -63,7 +63,7 @@ void mp3_player_task(void *p) {
   while (1) {
     // xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
     xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
-    printf("\nSong byte recieved\n");
+    printf("Song byte recieved: 0x%x\n", byte_recieved);
     // send data to the mp3 decoder
   }
 }
