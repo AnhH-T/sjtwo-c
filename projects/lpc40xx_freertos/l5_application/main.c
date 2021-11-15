@@ -14,6 +14,7 @@
 #include "i2c_slave_functions.h"
 #include "i2c_slave_init.h"
 #include "uart_lab.h"
+#include "ssp2_lab.h"
 
 QueueHandle_t Q_songname;
 QueueHandle_t Q_songdata;
@@ -39,7 +40,7 @@ static void open_file_and_send_song_data_bytes(songName_s *name) {
       result = f_read(&file, &byte_recieve.byte, sizeof(buffer_s), &br);
       if (FR_OK == result) {
         xQueueSend(Q_songdata, &byte_recieve.byte, portMAX_DELAY);
-        printf("Sent song byte\n");
+        // printf("Sent song byte\n");
       } else
         printf("Couldnt read anything");
     } while (br != 0);
@@ -58,12 +59,11 @@ void mp3_reader_task(void *p) {
 
 // Player task receives song data over Q_songdata to send it to the MP3 decoder
 void mp3_player_task(void *p) {
-  char byte_recieved[512];
-  char temp_byte; // single bute
+  buffer_s byte_recieved;
   while (1) {
     // xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
     xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
-    printf("Song byte recieved: 0x%x\n", byte_recieved);
+    printf(" %x ", byte_recieved);
     // send data to the mp3 decoder
   }
 }
