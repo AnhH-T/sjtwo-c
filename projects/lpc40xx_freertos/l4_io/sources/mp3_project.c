@@ -1,30 +1,84 @@
 #include <stdint.h>
+#include <stdio.h>
 
 #include "mp3_project.h"
 
-void chip_select(void) { LPC_GPIO0->PIN &= ~(1 << 26); }
-void chip_deselect(void) { LPC_GPIO0->PIN |= (1 << 26); }
+void chip_select(void) { LPC_GPIO2->PIN &= ~(1 << 1); }
+void chip_deselect(void) { LPC_GPIO2->PIN |= (1 << 1); }
 
-void data_select(void) { LPC_GPIO1->PIN &= ~(1 << 31); }
-void data_deselect(void) { LPC_GPIO1->PIN |= (1 << 31); }
+void data_select(void) { LPC_GPIO2->PIN &= ~(1 << 2); }
+void data_deselect(void) { LPC_GPIO2->PIN |= (1 << 2); }
 
-void decoder__initialize() {
-  gpio_s DREQ = gpio__construct_as_input(1, 20);
-  gpio_s CS = gpio__construct_as_output(0, 26);
-  gpio_s DS = gpio__construct_as_output(1, 31);
+void set_RST() { LPC_GPIO2->SET |= (1 << 4); }
+void deset_RST() { LPC_GPIO2->CLR |= (1 << 4); }
 
+bool is_DREQ_set() { return LPC_GPIO2->PIN & (1 << 0) ? true : false; }
+
+void decoder_pin_config() {
+  gpio__construct_with_function(1, 0, GPIO__FUNCTION_4); // SCK2 [13]
+  gpio__construct_with_function(1, 1, GPIO__FUNCTION_4); // MOSI [11]
+  gpio__construct_with_function(1, 4, GPIO__FUNCTION_4); // MISO [12]
+
+  gpio_s DREQ = gpio__construct_with_function(2, 0, GPIO__FUNCITON_0_IO_PIN); // [3]
+  gpio_s CS = gpio__construct_with_function(2, 1, GPIO__FUNCITON_0_IO_PIN);   // [7]
+  gpio_s DS = gpio__construct_with_function(2, 2, GPIO__FUNCITON_0_IO_PIN);   // [6]
+  gpio_s RST = gpio__construct_with_function(2, 4, GPIO__FUNCITON_0_IO_PIN);
+
+  gpio__set_as_input(DREQ);
+  gpio__set_as_output(CS);
+  gpio__set_as_output(DS);
+  gpio__set_as_output(RST);
+}
+
+void mp3_decoder_init() {
+  decoder_pin_config();
+  printf("Pin Configured...\n");
   ssp2__initialize(1000);
+  printf("SPI Port 2 Init...\n");
 
-  gpio__set(CS);
-  gpio__set(DS);
+  set_RST();
+  ssp2__exchange_byte(0xFF);
+  printf("Test Byte Exchange...\n");
 
-  delay__ms(100);
-  sj2_write_decoder(0x0, 0x800 | 0x4);
+  chip_deselect();
+  data_deselect();
+  printf("Chip/Data Deselect...\n");
+
+  uint16_t MP3Status = sj2_read_decoder_unprotected(SCI_STATUS);
+  int vsVersion = (MP3Status >> 4) & 0x000F; // four version bits
+  printf("VS1053 Ver %d\n", vsVersion);
+
   delay__ms(200);
-  sj2_write_decoder(0x3, 0x6000);
+
+  uint16_t MP3Mode = sj2_read_decoder_unprotected(SCI_MODE);
+  printf("SCI_MODE = 0x%x\n", MP3Mode);
+
+  sj2_write_decoder(SCI_MODE, 0x0804);
+  printf("Set SCI_Mode...\n");
+  delay__ms(100);
+  sj2_write_decoder(SCI_VOL, 0x1919);
+  printf("Set SCI_VOL...\n");
+  delay__ms(200);
+  sj2_write_decoder(SCI_CLOCKF, 0x6000);
+  printf("Set SCI_CLOCKF...\n");
 }
 
 void sj2_write_decoder(uint8_t address, uint16_t data) {
+  while (!is_DREQ_set()) {
+    ; // wait
+  }
+  chip_select();
+  ssp2__exchange_byte(0x2); // Opcode for write
+  ssp2__exchange_byte(address);
+  ssp2__exchange_byte(data >> 8);
+  ssp2__exchange_byte(data);
+  while (!is_DREQ_set()) {
+    ; // wait
+  }
+  chip_deselect();
+}
+
+void sj2_write_decoder_unprotected(uint8_t address, uint16_t data) {
   chip_select();
   ssp2__exchange_byte(0x2); // Opcode for write
   ssp2__exchange_byte(address);
@@ -34,6 +88,24 @@ void sj2_write_decoder(uint8_t address, uint16_t data) {
 }
 
 uint16_t sj2_read_decoder(uint8_t address) {
+  while (!is_DREQ_set()) {
+    ; // wait
+  }
+  uint16_t data;
+  chip_select();
+  ssp2__exchange_byte(0x3); // Opcode for read
+  ssp2__exchange_byte(address);
+  data |= ssp2__exchange_byte(0xFF) << 8;
+  data |= ssp2__exchange_byte(0xFF) << 0;
+  while (!is_DREQ_set()) {
+    ; // wait
+  }
+  chip_deselect();
+
+  return data;
+}
+
+uint16_t sj2_read_decoder_unprotected(uint8_t address) {
   uint16_t data;
   chip_select();
   ssp2__exchange_byte(0x3); // Opcode for read
@@ -45,7 +117,7 @@ uint16_t sj2_read_decoder(uint8_t address) {
   return data;
 }
 
-void sj2_play_music(char data) {
+void sj2_send_music_data(char data) {
   data_select();
   ssp2__exchange_byte(data);
   data_deselect();

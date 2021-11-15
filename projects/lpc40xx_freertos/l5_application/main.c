@@ -8,6 +8,7 @@
 #include "common_macros.h"
 #include "ff.h"
 #include "gpio.h"
+#include "mp3_project.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
@@ -61,12 +62,16 @@ void mp3_reader_task(void *p) {
 
 void mp3_player_task(void *p) {
   songdata_s bytes_512;
+
   while (1) {
     xQueueReceive(Q_songdata, &bytes_512, portMAX_DELAY);
     for (int i = 0; i < 512; i++) {
-      fprintf(stderr, "%X ", bytes_512.data[i]);
+      while (!is_DREQ_set()) {
+        vTaskDelay(1);
+        printf("stuck");
+      }
+      sj2_send_music_data(bytes_512.data[i]);
     }
-    fprintf(stderr, "\n");
     // printf("%d: Received [%d] Bytes from Queue\n", count++, sizeof(bytes_512.data));
   }
 }
@@ -74,8 +79,8 @@ void mp3_player_task(void *p) {
 int main(void) {
   Q_songdata = xQueueCreate(5, sizeof(songdata_s));
   Q_songname = xQueueCreate(1, sizeof(songname_s));
-
   sj2_cli__init();
+  mp3_decoder_init();
   xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
 
