@@ -13,6 +13,7 @@
 #include "i2c.h"
 #include "i2c_slave_functions.h"
 #include "i2c_slave_init.h"
+#include "ssp2_lab.h"
 #include "uart_lab.h"
 
 QueueHandle_t Q_songname;
@@ -24,10 +25,10 @@ typedef struct {
 
 typedef struct {
   char byte[512];
-} buffer_s;
+} song_data_s;
 
 static void open_file_and_send_song_data_bytes(songName_s *name) {
-  buffer_s byte_recieve;
+  song_data_s byte_recieve;
   FIL file;
   UINT br; /* File read/write count */
   FRESULT result;
@@ -36,10 +37,10 @@ static void open_file_and_send_song_data_bytes(songName_s *name) {
   result = f_open(&file, name->song_Name, FA_READ);
   if (FR_OK == result) {
     do {
-      result = f_read(&file, &byte_recieve.byte, sizeof(buffer_s), &br);
+      result = f_read(&file, &byte_recieve.byte, sizeof(song_data_s), &br);
       if (FR_OK == result) {
         xQueueSend(Q_songdata, &byte_recieve.byte, portMAX_DELAY);
-        printf("Sent song byte\n");
+        // printf("Sent song byte\n");
       } else
         printf("Couldnt read anything");
     } while (br != 0);
@@ -56,22 +57,54 @@ void mp3_reader_task(void *p) {
   }
 }
 
+
+//-----------------------------MILE STONE 2----------------------------------
 // Player task receives song data over Q_songdata to send it to the MP3 decoder
+typedef struct {
+  uint8_t address;
+  uint8_t sci_reg;
+  uint8_t opcode_read;
+  song_data_s *song_data;
+} decoder_s;
+
+void mp3_cs(void) {
+  LPC_GPIO2->PIN &= ~(1 << 0);
+}
+void mp3_ds(void) {
+  LPC_GPIO2->PIN |= (1 << 0);
+}
+
+static void send_song_data_byte_to_mp3_decoder(song_data_s byte_recieved){
+//DREQ is low, the register will update
+//DREQ is high, incoming change
+  decoder_s d;
+  uint8_t dummy_bits = 0xFF;
+  uint8_t read_instruction = 0x3; // ch 7.4
+  uint8_t audio_data_address = 0x5;
+  mp3_cs();
+  d.opcode_read = ssp2_lab__exchange_byte(read_instruction); //send the read opcode instruction
+  d.address = ssp2_lab__exchange_byte(audio_data_address);
+
+  mp3_ds();
+}
+
 void mp3_player_task(void *p) {
-  char byte_recieved[512];
-  char temp_byte; // single bute
+  song_data_s byte_recieved;
+
   while (1) {
     // xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
     xQueueReceive(Q_songdata, &byte_recieved, portMAX_DELAY);
-    printf("\nSong byte recieved\n");
-    // send data to the mp3 decoder
+    // printf("\nSong byte recieved\n");
+    //send_song_data_byte_to_mp3_decoder(&byte_recieved);
   }
 }
 
 int main(void) {
+  const uint32_t spi_clock_mhz = 24;
   sj2_cli__init();
+  ssp2_lab__init(spi_clock_mhz);
   Q_songname = xQueueCreate(1, sizeof(songName_s));
-  Q_songdata = xQueueCreate(1, sizeof(buffer_s));
+  Q_songdata = xQueueCreate(1, sizeof(song_data_s));
   xTaskCreate(mp3_reader_task, "Mp3_Reader_Task", 4096 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   xTaskCreate(mp3_player_task, "Mp3_Player_Task", 4096 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
