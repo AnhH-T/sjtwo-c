@@ -13,8 +13,8 @@
 #include "i2c.h"
 #include "i2c_slave_functions.h"
 #include "i2c_slave_init.h"
-#include "uart_lab.h"
 #include "ssp2_lab.h"
+#include "uart_lab.h"
 
 QueueHandle_t Q_songname;
 QueueHandle_t Q_songdata;
