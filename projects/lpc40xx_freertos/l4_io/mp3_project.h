@@ -31,7 +31,7 @@ void data_select(void);
 void data_deselect(void);
 void set_RST();
 void deset_RST();
-bool is_DREQ_set();
+bool DREQ_Ready();
 
 void decoder_pin_config();
 

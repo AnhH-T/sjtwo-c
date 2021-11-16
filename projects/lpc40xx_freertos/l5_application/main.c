@@ -66,9 +66,8 @@ void mp3_player_task(void *p) {
   while (1) {
     xQueueReceive(Q_songdata, &bytes_512, portMAX_DELAY);
     for (int i = 0; i < 512; i++) {
-      while (!is_DREQ_set()) {
+      while (!DREQ_Ready()) {
         vTaskDelay(1);
-        printf("stuck");
       }
       sj2_send_music_data(bytes_512.data[i]);
     }
