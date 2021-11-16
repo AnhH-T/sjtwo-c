@@ -30,21 +30,19 @@ void decoder_pin_config() {
   gpio__set_as_output(RST);
 }
 
-
-//Bring VS1053 out of reset, init the pins and ready the vsdsp for playback
+// Bring VS1053 out of reset, init the pins and ready the vsdsp for playback
 void mp3_decoder_init() {
 
-  decoder_pin_config(); //set sj2 pins
+  decoder_pin_config(); // set sj2 pins
   printf("Pin Configured...\n");
 
-  ssp2__initialize(1000);// init spi bus
+  ssp2__initialize(1000); // init spi bus
   printf("SPI Port 2 Init...\n");
 
-  // ssp2__exchange_byte(0xFF);
-  // printf("Test Byte Exchange...\n");
+  ssp2__exchange_byte(0xFF);
+  printf("Test Byte Exchange...\n");
 
   deset_RST();
-  set_RST();
   printf("Board has been reset..\n");
 
   chip_deselect();
@@ -54,23 +52,23 @@ void mp3_decoder_init() {
   uint16_t MP3Status = sj2_read_decoder_unprotected(SCI_STATUS);
   int vsVersion = (MP3Status >> 4) & 0x000F; // four version bits
   printf("VS1053 Ver %d\n", vsVersion);
-  delay__ms(1000);
+  delay__ms(200);
 
   uint16_t MP3Mode = sj2_read_decoder_unprotected(SCI_MODE);
   printf("SCI_MODE = 0x%x\n", MP3Mode);
-  delay__ms(1000);
+  delay__ms(200);
 
   sj2_write_decoder(SCI_MODE, 0x0804); // we get stuck here
   printf("Set SCI_Mode...\n");
-  delay__ms(1000);
+  delay__ms(200);
 
   sj2_write_decoder(SCI_VOL, 0x1919);
   printf("Set SCI_VOL...\n");
-  delay__ms(1000);
+  delay__ms(200);
 
   sj2_write_decoder(SCI_CLOCKF, 0x6000);
   printf("Set SCI_CLOCKF...\n");
-  delay__ms(1000);
+  delay__ms(200);
 }
 
 void sj2_write_decoder(uint8_t address, uint16_t data) {
