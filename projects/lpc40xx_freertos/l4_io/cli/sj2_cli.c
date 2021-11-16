@@ -42,14 +42,11 @@ void sj2_cli__init(void) {
       .help_message_for_command =
           "Resumes or suspends a task through <taskcontrol suspend name> or <taskcontrol resume name>.\n",
       .app_cli_handler = cli__task_control};
-  static app_cli__command_s mp3 = {.command_name = "mp3",
-                                   .help_message_for_command = "plays a song with the given file name. \n",
-                                   .app_cli_handler = cli__mp3};
 
   static app_cli__command_s mp3 = {.command_name = "mp3",
                                    .help_message_for_command =
                                        "Play another song by typing: mp3 play insert_song_name.mp3\n",
-                                   .app_cli_handler = cli__mp3_play};
+                                   .app_cli_handler = cli__mp3};
 
   // Add your CLI commands in descending sorted order to make them appear in sorted order
   app_cli__add_command_handler(&sj2_cli_struct, &uart3_transmit);

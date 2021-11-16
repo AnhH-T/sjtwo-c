@@ -3,6 +3,7 @@
 #include "gpio.h"
 #include "lpc40xx.h"
 #include "ssp2.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 /* VS1053B V4  Registers */
