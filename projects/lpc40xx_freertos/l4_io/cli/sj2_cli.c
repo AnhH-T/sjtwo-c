@@ -29,8 +29,9 @@ void sj2_cli__init(void) {
                                          "Deliberately crashes the system to demonstrate how to debug a crash",
                                      .app_cli_handler = cli__crash_me};
   static app_cli__command_s i2c = {.command_name = "i2c",
-                                   .help_message_for_command = "i2c read 0xDD 0xRR <n>\n"
-                                                               "i2c write 0xDD 0xRR <value> <value> ...",
+                                   .help_message_for_command =
+                                       "i2c read (slave address) (slave register) <n>\n"
+                                       "i2c write (slave address) (slave register) <value> <value> ...",
                                    .app_cli_handler = cli__i2c};
   static app_cli__command_s task_list = {.command_name = "tasklist",
                                          .help_message_for_command =

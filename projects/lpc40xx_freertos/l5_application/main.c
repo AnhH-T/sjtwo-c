@@ -8,6 +8,7 @@
 #include "common_macros.h"
 #include "ff.h"
 #include "gpio.h"
+#include "mp3_lcd.h"
 #include "mp3_project.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
@@ -79,12 +80,14 @@ void mp3_player_task(void *p) {
 int main(void) {
   Q_songdata = xQueueCreate(5, sizeof(songdata_s));
   Q_songname = xQueueCreate(1, sizeof(songname_s));
+
   sj2_cli__init();
   mp3_decoder_init();
+  init_i2c_lcd(0x4E);
+
   xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
-
   return 0;
 }

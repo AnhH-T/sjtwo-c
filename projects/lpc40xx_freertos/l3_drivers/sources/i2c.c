@@ -11,7 +11,7 @@
 #include "i2c_slave_functions.h"
 
 /// Set to non-zero to enable debugging, and then you can use I2C__DEBUG_PRINTF()
-#define I2C__ENABLE_DEBUGGING 0
+#define I2C__ENABLE_DEBUGGING 1
 
 #if I2C__ENABLE_DEBUGGING
 #include <stdio.h>
@@ -298,7 +298,7 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
 
   /*
    ***********************************************************************************************************
-   * Write-mode state transition :
+   * Write-mode state transition : (0x08) -> (0x18) -> (0x28>)-> ... -> (0x28) -> stop
    * I2C__STATE_START --> I2C__STATE_MT_SLAVE_ADDR_ACK --> I2C__STATE_MT_SLAVE_DATA_ACK -->
    *                                                  ... (I2C__STATE_MT_SLAVE_DATA_ACK) --> (stop)
    *
@@ -383,7 +383,7 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     break;
 
   // Slave acknowledged the data byte we sent, so send more bytes or finish the transaction by sending STOP
-  case I2C__STATE_MT_SLAVE_DATA_ACK:
+  case I2C__STATE_MT_SLAVE_DATA_ACK: // State 0x28
     // We were flagged as a READ transaction, so send repeat start
     if (i2c__is_read_address(i2c->slave_address)) {
       i2c__set_start_flag(lpc_i2c);
