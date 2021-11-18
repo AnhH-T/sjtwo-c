@@ -53,11 +53,10 @@ void mp3_decoder_init() {
   uint16_t MP3Mode = sj2_read_decoder(SCI_MODE);
   printf("SCI_MODE = 0x%x\n", MP3Mode);
 
-  sj2_write_decoder(SCI_MODE, 0x4800);
-  printf("Set SCI_Mode...\n");
   delay__ms(100);
-  sj2_write_decoder(SCI_VOL, 0x1919);
-  printf("Set SCI_VOL...\n");
+  sj2_write_decoder(SCI_VOL, 0x5050);
+  uint16_t volume = sj2_read_decoder(SCI_VOL);
+  printf("SCI_VOL = 0x%x\n", volume);
   delay__ms(200);
   sj2_write_decoder(SCI_CLOCKF, 0x6000);
   printf("Set SCI_CLOCKF...\n");

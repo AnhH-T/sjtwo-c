@@ -62,14 +62,18 @@ void mp3_reader_task(void *p) {
 
 void mp3_player_task(void *p) {
   songdata_s bytes_512;
-
+  uint8_t counter = 32;
   while (1) {
     xQueueReceive(Q_songdata, &bytes_512, portMAX_DELAY);
     for (int i = 0; i < 512; i++) {
-      while (!DREQ_Ready()) {
-        vTaskDelay(1);
+      if (counter > 31) {
+        while (!DREQ_Ready()) {
+          ;
+        }
+        counter = 0;
       }
       sj2_send_music_data(bytes_512.data[i]);
+      counter++;
     }
     // printf("%d: Received [%d] Bytes from Queue\n", count++, sizeof(bytes_512.data));
   }
