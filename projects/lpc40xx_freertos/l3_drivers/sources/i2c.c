@@ -370,7 +370,7 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     break;
 
   // Slave acknowledged its address, so send the first register
-  case I2C__STATE_MT_SLAVE_ADDR_ACK:
+  case I2C__STATE_MT_SLAVE_ADDR_ACK: // State 0x18
     i2c__clear_start_flag(lpc_i2c);
 
     // No data to transfer, this is used just to test if the slave responds

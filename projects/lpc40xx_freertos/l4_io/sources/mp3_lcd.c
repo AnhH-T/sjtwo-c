@@ -9,6 +9,7 @@ void set_function() {}
 void set_display() {}
 void entry_mode() {}
 
+// page 23 on HD44780
 void init_i2c_lcd(uint8_t slave_address_to_respond_to) {
   display_clear();
   set_function();

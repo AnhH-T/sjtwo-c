@@ -58,7 +58,7 @@ void mp3_decoder_init() {
   printf("SCI_MODE = 0x%x\n", MP3Mode);
   delay__ms(200);
 
-  sj2_write_decoder(SCI_MODE, 0x0804); // we get stuck here
+  sj2_write_decoder(SCI_MODE, 0x0804);
   printf("Set SCI_Mode...\n");
   delay__ms(200);
 
