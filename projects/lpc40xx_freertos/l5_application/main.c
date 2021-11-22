@@ -83,7 +83,6 @@ int main(void) {
 
   sj2_cli__init();
   mp3_decoder_init();
-  init_i2c_lcd(lcd_slave_address);
 
   xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
