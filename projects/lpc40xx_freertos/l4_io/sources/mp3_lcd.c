@@ -23,35 +23,36 @@ void lcd_uart_pins_init() {
   gpio__reset(lcd__enable);
 
   // bits 0-3 are for 8 bit mode
-  lcd__db0 = gpio__construct_with_function(GPIO__PORT_0, 26, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db0 = gpio__construct_with_function(GPIO__PORT_1, 14, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db0);
 
-  lcd__db1 = gpio__construct_with_function(GPIO__PORT_0, 9, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db1 = gpio__construct_with_function(GPIO__PORT_4, 29, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db1);
 
-  lcd__db2 = gpio__construct_with_function(GPIO__PORT_0, 8, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db2 = gpio__construct_with_function(GPIO__PORT_0, 7, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db2);
 
-  lcd__db3 = gpio__construct_with_function(GPIO__PORT_0, 7, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db3 = gpio__construct_with_function(GPIO__PORT_0, 9, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db3);
   // bits 4-7 are for 4 bit mode
-  lcd__db4 = gpio__construct_with_function(GPIO__PORT_0, 6, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db4 = gpio__construct_with_function(GPIO__PORT_0, 25, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db4);
 
-  lcd__db5 = gpio__construct_with_function(GPIO__PORT_4, 29, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db5 = gpio__construct_with_function(GPIO__PORT_1, 30, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db5);
 
-  lcd__db6 = gpio__construct_with_function(GPIO__PORT_4, 28, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db6 = gpio__construct_with_function(GPIO__PORT_1, 23, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db6);
 
-  lcd__db7 = gpio__construct_with_function(GPIO__PORT_1, 14, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db7 = gpio__construct_with_function(GPIO__PORT_1, 29, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db7);
 }
 
 void lcd_init() {
   lcd_uart_pins_init();
   delay__ms(50);
-
+  RS_bit(0);
+  RW_bit(0);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);

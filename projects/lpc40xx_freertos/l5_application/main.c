@@ -8,13 +8,13 @@
 #include "common_macros.h"
 #include "ff.h"
 #include "gpio.h"
-#include "mp3_lcd.h"
-#include "mp3_project.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
-
 #include "songname.h"
+
+#include "mp3_lcd.h"
+#include "mp3_project.h"
 
 typedef struct {
   char data[512];
@@ -57,6 +57,7 @@ void mp3_reader_task(void *p) {
     xQueueReceive(Q_songname, &song, portMAX_DELAY);
     vTaskDelay(1000);
     printf("Requested song [%s] has been received\n", song.name);
+    lcd_print_string(song.name);
     read_mp3_file(song);
   }
 }
@@ -76,14 +77,13 @@ void mp3_player_task(void *p) {
     // printf("%d: Received [%d] Bytes from Queue\n", count++, sizeof(bytes_512.data));
   }
 }
-
 int main(void) {
   Q_songdata = xQueueCreate(5, sizeof(songdata_s));
   Q_songname = xQueueCreate(1, sizeof(songname_s));
 
   sj2_cli__init();
   mp3_decoder_init();
-
+  lcd_init();
   xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
 
