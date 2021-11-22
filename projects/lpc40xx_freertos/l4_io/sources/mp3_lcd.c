@@ -50,19 +50,21 @@ void lcd_uart_pins_init() {
 
 void lcd_init() {
   lcd_uart_pins_init();
-  delay__ms(50);
   RS_bit(0);
   RW_bit(0);
+  delay__ms(50);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
-
-  lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS);
-
-  lcd_command(LCD_DISPLAYOFF);
-  lcd_command(clear_display);
-  lcd_command(entry_mode_increment_on_shift_off);
-  lcd_command(LCD_DISPLAYON);
+  lcd_command(0x3C);
+  lcd_command(0x01);
+  lcd_command(0x06);
+  lcd_command(0x0F);
+  // lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS);
+  // lcd_command(LCD_DISPLAYOFF);
+  // lcd_command(clear_display);
+  // lcd_command(entry_mode_increment_on_shift_off);
+  // lcd_command(LCD_DISPLAYON);
 }
 
 void lcd_clock() {
@@ -84,6 +86,7 @@ void lcd_command(uint8_t command) {
   DB1_bit(((1 << 1) & command));
   DB0_bit(((1 << 0) & command));
   lcd_clock();
+  delay__ms(10);
 }
 
 void lcd_set_position(uint8_t x, uint8_t y) {
