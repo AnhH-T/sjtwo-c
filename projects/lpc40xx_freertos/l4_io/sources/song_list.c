@@ -1,8 +1,9 @@
-#include <string.h>
 
 #include "song_list.h"
+#include <string.h>
 
 #include "ff.h"
+#include "mp3_lcd.h"
 
 static song_memory_t list_of_songs[32];
 static size_t number_of_songs;
@@ -10,8 +11,7 @@ static size_t number_of_songs;
 static void song_list__handle_filename(const char *filename) {
   // This will not work for cases like "file.mp3.zip"
   if (NULL != strstr(filename, ".mp3")) {
-    // printf("Filename: %s\n", filename);
-
+    printf("Filename: %s\n", filename);
     // Dangerous function: If filename is > 128 chars, then it will copy extra bytes leading to memory corruption
     // strcpy(list_of_songs[number_of_songs], filename);
 

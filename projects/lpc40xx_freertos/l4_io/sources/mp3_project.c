@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
-
+#include "delay.h"
 #include "mp3_project.h"
 
 void chip_select(void) { LPC_GPIO2->PIN &= ~(1 << 1); }
@@ -54,7 +54,8 @@ void mp3_decoder_init() {
   printf("SCI_MODE = 0x%x\n", MP3Mode);
 
   delay__ms(100);
-  sj2_write_decoder(SCI_VOL, 0x5050);
+  // sj2_write_decoder(SCI_VOL, 0x5050);
+  sj2_write_decoder(SCI_VOL, 0x2424); // max volume for demo
   uint16_t volume = sj2_read_decoder(SCI_VOL);
   printf("SCI_VOL = 0x%x\n", volume);
   delay__ms(200);

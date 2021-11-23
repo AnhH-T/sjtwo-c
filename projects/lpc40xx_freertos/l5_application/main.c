@@ -11,6 +11,7 @@
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
+#include "song_list.h"
 #include "songname.h"
 
 #include "mp3_lcd.h"
@@ -81,6 +82,16 @@ void mp3_player_task(void *p) {
   }
 }
 
+void mp3_display_menu() {
+  gpio_s button = gpio__construct_as_input(0, 29);
+  while (1) {
+    if (gpio__get(button)) {
+      song_list__populate(); // prints the song list as well
+      vTaskDelay(5000);
+    }
+  }
+}
+
 int main(void) {
   Q_songdata = xQueueCreate(5, sizeof(songdata_s));
   Q_songname = xQueueCreate(1, sizeof(songname_s));
@@ -88,7 +99,9 @@ int main(void) {
   sj2_cli__init();
   mp3_decoder_init();
   lcd_init();
-  xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+
+  xTaskCreate(mp3_display_menu, "button", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
