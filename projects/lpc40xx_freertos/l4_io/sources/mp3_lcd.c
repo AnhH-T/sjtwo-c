@@ -1,12 +1,6 @@
 #include "mp3_lcd.h"
 #include "delay.h"
 
-/**
-lcd__reg_select; (0)
-lcd__read_write_select;(1)
-lcd__enable;(2)
-lcd__db0 -> lcd__db7;(3-11)
-**/
 void lcd_uart_pins_init() {
   lcd__reg_select = gpio__construct_with_function(GPIO__PORT_4, 28, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__reg_select);
@@ -54,11 +48,10 @@ void lcd_init() {
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
-  lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS); // 0001 1100
+  lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS); // 0011 1100
   lcd_command(clear_display);                           // 0000 0001
   lcd_command(entry_mode_increment_on_shift_off);       // 0000 0110
   lcd_command(LCD_DISPLAYCONTROL | LCD_DISPLAYON);      // 0000 1100
-  lcd_command(0x1C);
 }
 
 void lcd_clock() {
@@ -83,18 +76,6 @@ void lcd_command(uint8_t command) {
   delay__ms(10);
 }
 
-void lcd_print_string_for_line_1(const char *string) {
-  lcd_command(clear_display);
-  // set position to the start of line 1
-  lcd_set_position(0, 0);
-
-  for (int i = 0; i < 16; i++) {
-    if (string[i] == '\0')
-      break;
-    lcd_print(string[i]);
-  }
-}
-
 void lcd_print(uint8_t character) {
   Reg_select_bit(1);
   RW_bit(0);
@@ -109,24 +90,40 @@ void lcd_print(uint8_t character) {
   lcd_clock();
 }
 
-void lcd_print_string_for_line_2(const char *string) {
-  lcd_command(clear_display);
-  // set position to the start of line 1
-  lcd_set_position(0, 1);
-
-  for (int i = 0; i < 16; i++) {
-    if (string[i] == '\0')
-      break;
-    lcd_print(string[i]);
-  }
-}
-
 void lcd_set_position(uint8_t cursor, uint8_t line) {
   bool second_line_currently_selected = (line == 1);
   if (second_line_currently_selected) {
     cursor += 0x40; //
   }
   lcd_command(0x80 | cursor);
+}
+
+void lcd_print_string_for_line_1(const char *string) {
+  lcd_command(clear_display);
+  // set position to the start of line 1
+  lcd_set_position(0, 0);
+
+  for (int i = 0; i < 16; i++) {
+    bool end_of_string = (string[i] == '\0');
+    bool string_dot_extension = (string[i] == '.');
+    if (end_of_string || string_dot_extension)
+      break;
+    lcd_print(string[i]);
+  }
+}
+
+void lcd_print_string_for_line_2(const char *string) {
+  lcd_command(clear_display);
+  // set position to the start of line 1
+  lcd_set_position(0, 1);
+
+  for (int i = 0; i < 16; i++) {
+    bool end_of_string = (string[i] == '\0');
+    bool string_dot_extension = (string[i] == '.');
+    if (end_of_string || string_dot_extension)
+      break;
+    lcd_print(string[i]);
+  }
 }
 
 // pin configerations
