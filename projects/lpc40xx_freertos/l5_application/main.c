@@ -87,6 +87,7 @@ void mp3_display_menu() {
   gpio__construct_as_input(0, 29);
   while (1) {
     if (gpiox__get_level(0, 29)) {
+      lcd_command(clear_display);
       song_list__populate(); // prints the song list as well
       break;
     }
