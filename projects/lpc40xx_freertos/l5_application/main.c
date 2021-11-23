@@ -15,6 +15,7 @@
 
 #include "mp3_lcd.h"
 #include "mp3_project.h"
+#include "song_list.h"
 
 typedef struct {
   char data[512];
@@ -88,9 +89,11 @@ int main(void) {
   sj2_cli__init();
   mp3_decoder_init();
   lcd_init();
+
+  song_list__populate(); // prints the song list as well
+
   xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
   return 0;
 }

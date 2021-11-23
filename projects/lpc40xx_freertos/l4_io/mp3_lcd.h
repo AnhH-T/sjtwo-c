@@ -16,7 +16,7 @@
 #define ddram_address 0x80 // physical display location, which memoery addres we are going to display at
 
 // flags for function set
-#define LCD_8BITMODE 0x10
+#define LCD_8BITMODE 0x30
 #define LCD_4BITMODE 0x00
 #define LCD_2LINE 0x08
 #define LCD_1LINE 0x00
