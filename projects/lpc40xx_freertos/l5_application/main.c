@@ -57,7 +57,7 @@ void mp3_reader_task(void *p) {
     xQueueReceive(Q_songname, &song, portMAX_DELAY);
     vTaskDelay(1000);
     printf("Requested song [%s] has been received\n", song.name);
-    lcd_print_string(song.name);
+    lcd_print_string_for_line_1(song.name);
     read_mp3_file(song);
   }
 }

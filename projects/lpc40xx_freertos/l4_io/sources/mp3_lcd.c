@@ -1,7 +1,5 @@
 #include "mp3_lcd.h"
-
-static uint8_t x_position = 0;
-static uint8_t y_position = 0;
+#include "delay.h"
 
 /**
 lcd__reg_select; (0)
@@ -50,21 +48,17 @@ void lcd_uart_pins_init() {
 
 void lcd_init() {
   lcd_uart_pins_init();
-  RS_bit(0);
+  Reg_select_bit(0);
   RW_bit(0);
   delay__ms(50);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
   lcd_command(LCD_8BITMODE);
-  lcd_command(0x3C);
-  lcd_command(0x01);
-  lcd_command(0x06);
-  lcd_command(0x0F);
-  // lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS);
-  // lcd_command(LCD_DISPLAYOFF);
-  // lcd_command(clear_display);
-  // lcd_command(entry_mode_increment_on_shift_off);
-  // lcd_command(LCD_DISPLAYON);
+  lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS); // 0001 1100
+  lcd_command(clear_display);                           // 0000 0001
+  lcd_command(entry_mode_increment_on_shift_off);       // 0000 0110
+  lcd_command(LCD_DISPLAYCONTROL | LCD_DISPLAYON);      // 0000 1100
+  lcd_command(0x1C);
 }
 
 void lcd_clock() {
@@ -75,7 +69,7 @@ void lcd_clock() {
 }
 
 void lcd_command(uint8_t command) {
-  RS_bit(0);
+  Reg_select_bit(0);
   RW_bit(0);
   DB7_bit(((1 << 7) & command));
   DB6_bit(((1 << 6) & command));
@@ -89,26 +83,20 @@ void lcd_command(uint8_t command) {
   delay__ms(10);
 }
 
-void lcd_set_position(uint8_t x, uint8_t y) {
-  if (y == 1) {
-    x += 0x40;
+void lcd_print_string_for_line_1(const char *string) {
+  lcd_command(clear_display);
+  // set position to the start of line 1
+  lcd_set_position(0, 0);
+
+  for (int i = 0; i < 16; i++) {
+    if (string[i] == '\0')
+      break;
+    lcd_print(string[i]);
   }
-  lcd_command(0x80 | x);
 }
 
 void lcd_print(uint8_t character) {
-  if (x_position > 15) {
-    if (y_position > 0) {
-      lcd_set_position(0, 0);
-      y_position = 0;
-    } else {
-      y_position++;
-      lcd_set_position(0, 1);
-    }
-    x_position = 0;
-  }
-
-  RS_bit(1);
+  Reg_select_bit(1);
   RW_bit(0);
   DB7_bit(((1 << 7) & character));
   DB6_bit(((1 << 6) & character));
@@ -119,20 +107,30 @@ void lcd_print(uint8_t character) {
   DB1_bit(((1 << 1) & character));
   DB0_bit(((1 << 0) & character));
   lcd_clock();
-
-  x_position++;
 }
 
-void lcd_print_string(const char *song_name) {
-  for (int i = 0; i < 32; i++) {
-    if (song_name[i] == '\0')
+void lcd_print_string_for_line_2(const char *string) {
+  lcd_command(clear_display);
+  // set position to the start of line 1
+  lcd_set_position(0, 1);
+
+  for (int i = 0; i < 16; i++) {
+    if (string[i] == '\0')
       break;
-    lcd_print(song_name[i]);
+    lcd_print(string[i]);
   }
 }
 
+void lcd_set_position(uint8_t cursor, uint8_t line) {
+  bool second_line_currently_selected = (line == 1);
+  if (second_line_currently_selected) {
+    cursor += 0x40; //
+  }
+  lcd_command(0x80 | cursor);
+}
+
 // pin configerations
-void RS_bit(bool active__1h) {
+void Reg_select_bit(bool active__1h) {
   if (active__1h)
     gpio__set(lcd__reg_select);
   else
