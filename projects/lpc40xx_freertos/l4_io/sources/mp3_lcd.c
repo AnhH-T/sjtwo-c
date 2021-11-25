@@ -1,7 +1,78 @@
 #include "mp3_lcd.h"
 #include "delay.h"
 
-void lcd_uart_pins_init() {
+// private pin config functions
+static void Reg_select_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__reg_select);
+  else
+    gpio__reset(lcd__reg_select);
+}
+
+static void RW_bit(bool read__1h) {
+  if (read__1h)
+    gpio__set(lcd__read_write_select);
+  else
+    gpio__reset(lcd__read_write_select);
+}
+
+static void DB7_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db7);
+  else
+    gpio__reset(lcd__db7);
+}
+
+static void DB6_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db6);
+  else
+    gpio__reset(lcd__db6);
+}
+
+static void DB5_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db5);
+  else
+    gpio__reset(lcd__db5);
+}
+
+static void DB4_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db4);
+  else
+    gpio__reset(lcd__db4);
+}
+
+static void DB3_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db3);
+  else
+    gpio__reset(lcd__db3);
+}
+
+static void DB2_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db2);
+  else
+    gpio__reset(lcd__db2);
+}
+
+static void DB1_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db1);
+  else
+    gpio__reset(lcd__db1);
+}
+
+static void DB0_bit(bool active__1h) {
+  if (active__1h)
+    gpio__set(lcd__db0);
+  else
+    gpio__reset(lcd__db0);
+}
+
+static void lcd_uart_pins_init() {
   lcd__reg_select = gpio__construct_with_function(GPIO__PORT_4, 28, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__reg_select);
   gpio__reset(lcd__reg_select);
@@ -40,25 +111,70 @@ void lcd_uart_pins_init() {
   gpio__set_as_output(lcd__db7);
 }
 
-void lcd_init() {
-  lcd_uart_pins_init();
-  Reg_select_bit(0);
-  RW_bit(0);
-  delay__ms(50);
-  lcd_command(LCD_8BITMODE);
-  lcd_command(LCD_8BITMODE);
-  lcd_command(LCD_8BITMODE);
-  lcd_command(LCD_8BITMODE | LCD_2LINE | LCD_5x10DOTS); // 0011 1100
-  lcd_command(clear_display);                           // 0000 0001
-  lcd_command(entry_mode_increment_on_shift_off);       // 0000 0110
-  lcd_command(LCD_DISPLAYCONTROL | LCD_DISPLAYON);      // 0000 1100
-}
-
-void lcd_clock() {
+static void lcd_clock() {
   gpio__set(lcd__enable);
   delay__ms(1);
   gpio__reset(lcd__enable);
   delay__ms(1);
+}
+
+static void lcd_print(uint8_t character) {
+  Reg_select_bit(1);
+  RW_bit(0);
+  DB7_bit(((1 << 7) & character));
+  DB6_bit(((1 << 6) & character));
+  DB5_bit(((1 << 5) & character));
+  DB4_bit(((1 << 4) & character));
+  DB3_bit(((1 << 3) & character));
+  DB2_bit(((1 << 2) & character));
+  DB1_bit(((1 << 1) & character));
+  DB0_bit(((1 << 0) & character));
+  lcd_clock();
+}
+
+static void lcd_set_position(uint8_t cursor, uint8_t line) {
+  switch (line) {
+  case 0:
+    cursor += 0;
+    break;
+  case 1:
+    cursor += 0x40;
+    break;
+  case 2:
+    cursor += 0x14;
+    break;
+  case 3:
+    cursor += 0x54;
+    break;
+  default:
+    cursor = 0;
+  }
+
+  lcd_command(0x80 | cursor);
+}
+
+static void lcd_print_helper(const char *string) {
+  int count = 0;
+  for (count = 0; count < 20; count++) {
+    bool end_of_string = (string[count] == '\0');
+    bool string_dot_extension = (string[count] == '.');
+    if (end_of_string || string_dot_extension)
+      break;
+    lcd_print(string[count]);
+  }
+  while (count < 20) {
+    lcd_print(' ');
+    count++;
+  }
+}
+
+void lcd_clear_line(int line) {
+  char clear[20] = "                    ";
+  bool valid_line = (line < 4 && line >= 0);
+  if (valid_line) {
+    lcd_set_position(0, line);
+    lcd_print_helper(clear);
+  }
 }
 
 void lcd_command(uint8_t command) {
@@ -76,123 +192,60 @@ void lcd_command(uint8_t command) {
   delay__ms(10);
 }
 
-void lcd_print(uint8_t character) {
-  Reg_select_bit(1);
+static void lcd_set_8bit_mode() { lcd_command(0x30); }
+
+void lcd_clear() { lcd_command(0x01); }
+
+void lcd_home() { lcd_command(0x02); }
+
+void lcd_entry_mode_set(uint8_t inc_dec, uint8_t shift) {
+  inc_dec = (inc_dec << 1) & 0x02;
+  shift = shift & 0x01;
+  lcd_command(0x04 | inc_dec | shift);
+}
+
+void lcd_display_control(uint8_t display_on_off, uint8_t cursor_on_off, uint8_t cursor_blink) {
+  display_on_off = (display_on_off << 2) & 0x04;
+  cursor_on_off = (display_on_off << 1) & 0x02;
+  cursor_blink = cursor_blink & 0x01;
+  lcd_command(0x08 | display_on_off | cursor_on_off | cursor_blink);
+}
+
+void lcd_cursor_control(uint8_t cursor_shift, uint8_t right_left) {
+  cursor_shift = (cursor_shift << 3) & 0x08;
+  right_left = (right_left << 2) & 0x04;
+  lcd_command(0x10 | cursor_shift | right_left);
+}
+
+void lcd_function_set(uint8_t data_len, uint8_t lines, uint8_t font) {
+  data_len = (data_len << 4) & 0x10;
+  lines = (lines << 3) & 0x08;
+  font = (font << 2) & 0x04;
+  lcd_command(0x10 | data_len | lines | font);
+}
+
+void lcd_init() {
+  lcd_uart_pins_init();
+  Reg_select_bit(0);
   RW_bit(0);
-  DB7_bit(((1 << 7) & character));
-  DB6_bit(((1 << 6) & character));
-  DB5_bit(((1 << 5) & character));
-  DB4_bit(((1 << 4) & character));
-  DB3_bit(((1 << 3) & character));
-  DB2_bit(((1 << 2) & character));
-  DB1_bit(((1 << 1) & character));
-  DB0_bit(((1 << 0) & character));
-  lcd_clock();
+  delay__ms(50);
+  lcd_set_8bit_mode(); // LCD_8BITMODE 0x30
+  lcd_set_8bit_mode();
+  lcd_set_8bit_mode();
+  lcd_set_8bit_mode();
+  lcd_command(0x3C);
+  // lcd_function_set(LCD_LENGTH_8BIT, LCD_2_LINE, LCD_FONT_5_10);
+  lcd_clear();
+  lcd_entry_mode_set(LCD_INCREMENT, LCD_NO_SHIFT);
+  lcd_display_control(LCD_DISPLAY_ON, LCD_CURSOR_OFF, LCD_CURSOR_BLINK_OFF);
 }
 
-void lcd_set_position(uint8_t cursor, uint8_t line) {
-  bool second_line_currently_selected = (line == 1);
-  if (second_line_currently_selected) {
-    cursor += 0x40; //
-  }
-  lcd_command(0x80 | cursor);
+void lcd_print_string(const char *string, int line) {
+  lcd_set_position(0, line);
+  lcd_print_helper(string);
 }
 
-void lcd_print_string_for_line_1(const char *string) {
-  lcd_command(clear_display);
-  // set position to the start of line 1
-  lcd_set_position(0, 0);
-
-  for (int i = 0; i < 16; i++) {
-    bool end_of_string = (string[i] == '\0');
-    bool string_dot_extension = (string[i] == '.');
-    if (end_of_string || string_dot_extension)
-      break;
-    lcd_print(string[i]);
-  }
-}
-
-void lcd_print_string_for_line_2(const char *string) {
-  lcd_command(clear_display);
-  // set position to the start of line 1
-  lcd_set_position(0, 1);
-
-  for (int i = 0; i < 16; i++) {
-    bool end_of_string = (string[i] == '\0');
-    bool string_dot_extension = (string[i] == '.');
-    if (end_of_string || string_dot_extension)
-      break;
-    lcd_print(string[i]);
-  }
-}
-
-// pin configerations
-void Reg_select_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__reg_select);
-  else
-    gpio__reset(lcd__reg_select);
-}
-
-void RW_bit(bool read__1h) {
-  if (read__1h)
-    gpio__set(lcd__read_write_select);
-  else
-    gpio__reset(lcd__read_write_select);
-}
-
-void DB7_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db7);
-  else
-    gpio__reset(lcd__db7);
-}
-
-void DB6_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db6);
-  else
-    gpio__reset(lcd__db6);
-}
-
-void DB5_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db5);
-  else
-    gpio__reset(lcd__db5);
-}
-
-void DB4_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db4);
-  else
-    gpio__reset(lcd__db4);
-}
-
-void DB3_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db3);
-  else
-    gpio__reset(lcd__db3);
-}
-
-void DB2_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db2);
-  else
-    gpio__reset(lcd__db2);
-}
-
-void DB1_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db1);
-  else
-    gpio__reset(lcd__db1);
-}
-
-void DB0_bit(bool active__1h) {
-  if (active__1h)
-    gpio__set(lcd__db0);
-  else
-    gpio__reset(lcd__db0);
+void lcd_print_arrow_on_right_side(int line) {
+  lcd_set_position(19, line);
+  lcd_print('<');
 }

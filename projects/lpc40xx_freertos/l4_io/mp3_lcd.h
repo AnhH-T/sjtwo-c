@@ -6,52 +6,41 @@
 #include <stdio.h>
 
 // LCD instruction address
-#define clear_display 0x01
-#define return_home 0x02
-#define entry_mode_set 0x04
-#define display_power 0x08
-#define cursor_display_shift 0x10
-#define function_set 0x20
-#define cgram_adress 0x40  // used for custom characters
-#define ddram_address 0x80 // physical display location, which memoery addres we are going to display at
+#define LCD_INCREMENT 1
+#define LCD_DECREMENT 0
+#define LCD_SHIFT 1
+#define LCD_NO_SHIFT 0
+#define LCD_DISPLAY_ON 1
+#define LCD_DISPLAY_OFF 0
+#define LCD_CURSOR_ON 1
+#define LCD_CURSOR_OFF 0
+#define LCD_CURSOR_BLINK_ON 1
+#define LCD_CURSOR_BLINK_OFF 0
+#define LCD_MOVE_CURSOR 1
+#define LCD_MOVE_SHIFT 0
+#define LCD_MOVE_RIGHT 1
+#define LCD_MOVE_LEFT 0
+#define LCD_LENGTH_8BIT 1
+#define LCD_LENGTH_4BIT 0
+#define LCD_2_LINE 1
+#define LCD_1_LINE 0
+#define LCD_FONT_5_10 1
+#define LCD_FONT_5_8 0
 
-// flags for function set
-#define LCD_8BITMODE 0x30
-#define LCD_4BITMODE 0x00
-#define LCD_2LINE 0x08
-#define LCD_1LINE 0x00
-#define LCD_5x10DOTS 0x04
-#define LCD_5x8DOTS 0x00
-
-// flags for display on/off control
-#define LCD_DISPLAYCONTROL 0x08
-#define LCD_DISPLAYON 0x04
-#define LCD_CURSORON 0x02
-#define LCD_BLINKON 0x01
-#define entry_mode_increment_on_shift_off 0x06
 /* LCD Display Pins */
 gpio_s lcd__reg_select;
 gpio_s lcd__read_write_select;
 gpio_s lcd__enable;
 gpio_s lcd__db7, lcd__db6, lcd__db5, lcd__db4, lcd__db3, lcd__db2, lcd__db1, lcd__db0;
 
-void lcd_uart_pins_init();
 void lcd_init();
-void lcd_clock();
 void lcd_command(uint8_t command);
-void lcd_print(uint8_t character);
-void lcd_set_position(uint8_t cursor, uint8_t line);
-void lcd_print_string_for_line_1(const char *string);
-void lcd_print_string_for_line_2(const char *string);
-
-/* Pin Config */
-void Reg_select_bit(bool active__1h);
-void RW_bit(bool read__1h);
-void DB7_bit(bool active__1h);
-void DB6_bit(bool active__1h);
-void DB5_bit(bool active__1h);
-void DB4_bit(bool active__1h);
-void DB3_bit(bool active__1h);
-void DB2_bit(bool active__1h);
-void DB1_bit(bool active__1h);
-void DB0_bit(bool active__1h);
+void lcd_clear();
+void lcd_home();
+void lcd_entry_mode_set(uint8_t inc_dec, uint8_t shift);
+void lcd_display_control(uint8_t display_on_off, uint8_t cursor_on_off, uint8_t cursor_blink);
+void lcd_cursor_control(uint8_t cursor_shift, uint8_t right_left);
+void lcd_function_set(uint8_t data_len, uint8_t lines, uint8_t font);
+void lcd_print_arrow_on_right_side(int line);
+void lcd_clear_line(int line);
+void lcd_print_string(const char *string, int line);
