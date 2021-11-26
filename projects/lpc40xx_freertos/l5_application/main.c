@@ -59,6 +59,8 @@ void mp3_reader_task(void *p) {
     xQueueReceive(Q_songname, &song, portMAX_DELAY);
     vTaskDelay(1000);
     printf("Requested song [%s] has been received\n", song.name);
+    lcd_command(clear_display);
+    lcd_print_string(song.name);
     read_mp3_file(song);
   }
 }
@@ -100,9 +102,9 @@ int main(void) {
   sj2_cli__init();
   mp3_decoder_init();
   lcd_init();
-  lcd_print_string("Press button to display songlist");
+  lcd_print_string("Hello There !");
 
-  xTaskCreate(mp3_display_menu, "button", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // xTaskCreate(mp3_display_menu, "button", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(mp3_reader_task, "reader", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(mp3_player_task, "player", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
