@@ -97,8 +97,8 @@ void lcd_set_position(uint8_t x, uint8_t y) {
 }
 
 void lcd_print(uint8_t character) {
-  //lcd_set_position(0,y_position);
-  if (x_position > 15) { //if the string doesnt overflow print, 
+  // lcd_set_position(0,y_position);
+  if (x_position > 15) { // if the string doesnt overflow print,
     if (y_position > 0) {
       lcd_set_position(0, 0);
       y_position = 0;
