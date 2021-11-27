@@ -51,7 +51,7 @@ typedef enum {
   LPC_PERIPHERAL__SSP2 = 36,
 
   LPC_PERIPHERAL__GPDMA = 26,
-  LPC_PERIPHERAL__QEI = 31,
+  LPC_PERIPHERAL__QEI = 18,
 
 } lpc_peripheral_e;
 

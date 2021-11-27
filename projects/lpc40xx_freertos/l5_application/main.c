@@ -72,6 +72,7 @@ static void select_song_using_center_button_ISR() {
 }
 
 static void volume_ISR() {
+  LPC_QEI->CLR &= ~(1 << 0);
   current_state = volume;
   xSemaphoreGiveFromISR(Sem_mp3_control, NULL);
 }
@@ -168,7 +169,12 @@ static void songpicker_handler() {
 }
 
 static void volume_handler() {
-  // to be done
+  if (LPC_QEI->STAT & (1 << 0)) // If CCW
+  {
+    printf("Decrease Volume");
+  } else {
+    printf("Increase Volume");
+  }
 }
 
 // -----End of Helpers-------
@@ -176,7 +182,6 @@ static void volume_handler() {
 // Init functions
 
 void interrupt_init() {
-  button_init();
   lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio_interrupt, "ISR");
   NVIC_EnableIRQ(GPIO_IRQn);
   mp3__gpio_attach_interrupt(up_button, move_up_list_ISR);
@@ -184,6 +189,10 @@ void interrupt_init() {
   mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
   mp3__gpio_attach_interrupt(right_button, play_next_ISR);
   mp3__gpio_attach_interrupt(left_button, play_prev_ISR);
+
+  lpc_peripheral__enable_interrupt(QEI_IRQn, volume_ISR, "Volume");
+  NVIC_EnableIRQ(QEI_IRQn);
+  // LPC_QEI->IES |= (1 << 0); // Index Pulse Interrupt Enable
 }
 // -----End of inits-------
 
@@ -271,10 +280,10 @@ int main(void) {
   song_index = 0;
   Sem_mp3_control = xSemaphoreCreateBinary();
 
+  encoder_init();
   interrupt_init();
   mp3_decoder_init();
   lcd_init();
-  button_init();
   song_list__populate();
 
   lcd_print_string("Pick a song to play:", 0);

@@ -15,5 +15,7 @@ extern gpio_s right_button;  // SW5
 // Rotary Wheel
 extern gpio_s encA;
 extern gpio_s encB;
-
-void button_init();
+void encoder__turn_on_power(void);
+uint32_t encoder__get_index(void);
+void encoder__set_max_position(void);
+void encoder_init();

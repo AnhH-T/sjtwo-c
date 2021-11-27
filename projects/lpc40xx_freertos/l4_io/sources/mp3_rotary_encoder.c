@@ -31,3 +31,11 @@ uint32_t encoder__get_index(void) { return (LPC_QEI->INXCNT); } // Gets Index Va
 void encoder__set_max_position(void) {
   LPC_QEI->MAXPOS = 1;
 } // POS needs a max value so it can tick to increment / decrement index
+
+void encoder_init() {
+  button_init();
+  encoder__turn_on_power();
+  printf("Encoder Init");
+  // encoder__set_max_position();
+  // LPC_QEI->CONF |= (1 << 1);
+}
