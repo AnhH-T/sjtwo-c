@@ -27,12 +27,6 @@
 #define LCD_FONT_5_10 1
 #define LCD_FONT_5_8 0
 
-/* LCD Display Pins */
-gpio_s lcd__reg_select;
-gpio_s lcd__read_write_select;
-gpio_s lcd__enable;
-gpio_s lcd__db7, lcd__db6, lcd__db5, lcd__db4, lcd__db3, lcd__db2, lcd__db1, lcd__db0;
-
 void lcd_init();
 void lcd_command(uint8_t command);
 void lcd_clear();
@@ -43,4 +37,5 @@ void lcd_cursor_control(uint8_t cursor_shift, uint8_t right_left);
 void lcd_function_set(uint8_t data_len, uint8_t lines, uint8_t font);
 void lcd_print_arrow_on_right_side(int line);
 void lcd_clear_line(int line);
+void lcd_print_song_details_in_line_1_and_2(const char *string);
 void lcd_print_string(const char *string, int line);

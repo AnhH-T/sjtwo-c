@@ -1,5 +1,9 @@
 #include "mp3_lcd.h"
 #include "delay.h"
+gpio_s lcd__reg_select;
+gpio_s lcd__read_write_select;
+gpio_s lcd__enable;
+gpio_s lcd__db7, lcd__db6, lcd__db5, lcd__db4, lcd__db3, lcd__db2, lcd__db1, lcd__db0;
 
 // private pin config functions
 static void Reg_select_bit(bool active__1h) {
@@ -104,7 +108,7 @@ static void lcd_uart_pins_init() {
   lcd__db5 = gpio__construct_with_function(GPIO__PORT_1, 30, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db5);
 
-  lcd__db6 = gpio__construct_with_function(GPIO__PORT_1, 23, GPIO__FUNCITON_0_IO_PIN);
+  lcd__db6 = gpio__construct_with_function(GPIO__PORT_2, 6, GPIO__FUNCITON_0_IO_PIN);
   gpio__set_as_output(lcd__db6);
 
   lcd__db7 = gpio__construct_with_function(GPIO__PORT_1, 29, GPIO__FUNCITON_0_IO_PIN);
@@ -243,6 +247,40 @@ void lcd_init() {
 void lcd_print_string(const char *string, int line) {
   lcd_set_position(0, line);
   lcd_print_helper(string);
+}
+
+// Song must be in the form Artist-Song Title
+void lcd_print_song_details_in_line_1_and_2(const char *string) {
+  int index_of_string = 0;
+  int cursor = 0;
+  lcd_set_position(0, 1);
+  for (cursor = 0; cursor < 20; cursor++) {
+    bool separator = (string[index_of_string] == '-');
+    if (separator) {
+      index_of_string++; // get rid of - character
+      break;
+    }
+    lcd_print(string[index_of_string]);
+    index_of_string++;
+  }
+  while (cursor < 20) {
+    lcd_print(' ');
+    cursor++;
+  }
+
+  lcd_set_position(0, 2);
+  for (cursor = 0; cursor < 20; cursor++) {
+    bool end_of_string = (string[index_of_string] == '\0');
+    bool string_dot_extension = (string[index_of_string] == '.');
+    if (end_of_string || string_dot_extension)
+      break;
+    lcd_print(string[index_of_string]);
+    index_of_string++;
+  }
+  while (cursor < 20) {
+    lcd_print(' ');
+    cursor++;
+  }
 }
 
 void lcd_print_arrow_on_right_side(int line) {

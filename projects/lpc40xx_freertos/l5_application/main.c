@@ -19,10 +19,11 @@
 #include "mp3_isr.h"
 #include "mp3_lcd.h"
 #include "mp3_project.h"
+#include "mp3_rotary_encoder.h"
 #include "song_list.h"
 #include "songname.h"
 
-enum State { next, previous, paused, idle, movedown, moveup, songpicker, playing };
+enum State { next, previous, paused, idle, movedown, moveup, songpicker, playing, volume };
 
 typedef struct {
   char data[512];
@@ -39,62 +40,9 @@ int current_state = idle;
 bool middle_button_is_pause_button = false;
 bool pause = false;
 
-// Buttons
-gpio_s middle_button; // SW1
-gpio_s left_button;   // SW3
-gpio_s up_button;     // SW2
-gpio_s down_button;   // SW4
-gpio_s right_button;  // SW5
-
 // used to pause/play
 TaskHandle_t player_handle;
 void gpio_interrupt(void) { mp3__interrupt_dispatcher(); }
-
-void button_init() { // 0, 18 is middle
-  middle_button = gpio__construct_as_input(0, 18);
-  gpio__set_function(middle_button, GPIO__FUNCITON_0_IO_PIN);
-  left_button = gpio__construct_as_input(2, 9);
-  gpio__set_function(left_button, GPIO__FUNCITON_0_IO_PIN);
-  up_button = gpio__construct_as_input(0, 15);
-  gpio__set_function(up_button, GPIO__FUNCITON_0_IO_PIN);
-  down_button = gpio__construct_as_input(2, 7);
-  gpio__set_function(down_button, GPIO__FUNCITON_0_IO_PIN);
-  right_button = gpio__construct_as_input(2, 5);
-  gpio__set_function(right_button, GPIO__FUNCITON_0_IO_PIN);
-}
-
-void interrupt_init() {
-  button_init();
-  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio_interrupt, "ISR");
-  NVIC_EnableIRQ(GPIO_IRQn);
-}
-
-// Helpers
-void increment_song_index() {
-  song_index++;
-  if (song_index >= song_list__get_item_count()) {
-    song_index = 0;
-  }
-}
-
-void decrement_song_index() {
-  if (song_index == 0) {
-    song_index = song_list__get_item_count();
-  }
-  song_index--;
-}
-
-void print_3_songs_with_selector() {
-  decrement_song_index();
-  lcd_print_string(song_list__get_name_for_item(song_index), 1);
-  increment_song_index();
-  lcd_print_string(song_list__get_name_for_item(song_index), 2);
-  increment_song_index();
-  lcd_print_string(song_list__get_name_for_item(song_index), 3);
-  decrement_song_index();
-  lcd_print_arrow_on_right_side(2);
-}
-// -----End of Helpers-------
 
 // Interrupt Functions
 static void play_next_ISR() {
@@ -123,14 +71,126 @@ static void select_song_using_center_button_ISR() {
   xSemaphoreGiveFromISR(Sem_mp3_control, NULL);
 }
 
+static void volume_ISR() {
+  current_state = volume;
+  xSemaphoreGiveFromISR(Sem_mp3_control, NULL);
+}
+
 // -----End of Interrupts-----
+
+// Helpers
+void increment_song_index() {
+  song_index++;
+  if (song_index >= song_list__get_item_count()) {
+    song_index = 0;
+  }
+}
+
+void decrement_song_index() {
+  if (song_index == 0) {
+    song_index = song_list__get_item_count();
+  }
+  song_index--;
+}
+
+void print_3_songs_with_selector() {
+  decrement_song_index();
+  lcd_print_string(song_list__get_name_for_item(song_index), 1);
+  increment_song_index();
+  lcd_print_string(song_list__get_name_for_item(song_index), 2);
+  increment_song_index();
+  lcd_print_string(song_list__get_name_for_item(song_index), 3);
+  decrement_song_index();
+  lcd_print_arrow_on_right_side(2);
+}
+
+void print_song_info_and_send_song_into_queue() {
+  lcd_print_string("Now Playing: ", 0);
+  lcd_print_song_details_in_line_1_and_2(song_list__get_name_for_item(song_index));
+  xQueueSend(Q_songname, song_list__get_name_for_item(song_index), portMAX_DELAY);
+}
+
+void force_unpause() {
+  if (pause) {
+    vTaskResume(player_handle);
+    pause = false;
+  }
+}
+
+static void pause_handler() {
+  if (!pause)
+    vTaskResume(player_handle);
+  else
+    vTaskSuspend(player_handle);
+  vTaskDelay(200);
+}
+
+static void next_handler() {
+  increment_song_index();
+  lcd_clear();
+  print_song_info_and_send_song_into_queue();
+  force_unpause();
+}
+
+static void previous_handler() {
+  decrement_song_index();
+  lcd_clear();
+  print_song_info_and_send_song_into_queue();
+  force_unpause();
+}
+
+static void moveup_handler() {
+  lcd_print_string("Pick a song to play:", 0);
+  if (middle_button_is_pause_button) {
+    mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
+    middle_button_is_pause_button = false;
+  }
+  decrement_song_index();
+  print_3_songs_with_selector();
+}
+
+static void movedown_handler() {
+  lcd_print_string("Pick a song to play:", 0);
+  if (middle_button_is_pause_button) {
+    mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
+    middle_button_is_pause_button = false;
+  }
+  increment_song_index();
+  print_3_songs_with_selector();
+}
+
+static void songpicker_handler() {
+  lcd_clear();
+  print_song_info_and_send_song_into_queue();
+  mp3__gpio_attach_interrupt(middle_button, play_pause_ISR);
+  middle_button_is_pause_button = true;
+  force_unpause();
+}
+
+static void volume_handler() {
+  // to be done
+}
+
+// -----End of Helpers-------
+
+// Init functions
+
+void interrupt_init() {
+  button_init();
+  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio_interrupt, "ISR");
+  NVIC_EnableIRQ(GPIO_IRQn);
+  mp3__gpio_attach_interrupt(up_button, move_up_list_ISR);
+  mp3__gpio_attach_interrupt(down_button, move_down_list_ISR);
+  mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
+  mp3__gpio_attach_interrupt(right_button, play_next_ISR);
+  mp3__gpio_attach_interrupt(left_button, play_prev_ISR);
+}
+// -----End of inits-------
 
 static void read_loop(FIL *file) {
   songdata_s buffer;
   UINT br = 1;
   FRESULT result;
-  vTaskResume(player_handle);
-  pause = false;
   while ((br != 0) && (uxQueueMessagesWaiting(Q_songname) == 0)) {
     result = f_read(file, &buffer.data, sizeof(songdata_s), &br);
     if (FR_OK == result) {
@@ -185,47 +245,21 @@ void mp3_player_task(void *p) {
 void mp3_control(void *p) {
   while (1) {
     if (xSemaphoreTake(Sem_mp3_control, portMAX_DELAY)) {
-      if (current_state == paused) {
-        if (pause)
-          vTaskResume(player_handle);
-        else
-          vTaskSuspend(player_handle);
-      } else if (current_state == next) {
-        increment_song_index();
-        lcd_clear();
-        lcd_print_string("Playing: ", 0);
-        lcd_print_string(song_list__get_name_for_item(song_index), 1);
-        xQueueSend(Q_songname, song_list__get_name_for_item(song_index), portMAX_DELAY);
-      } else if (current_state == previous) {
-        decrement_song_index();
-        lcd_clear();
-        lcd_print_string("Playing: ", 0);
-        lcd_print_string(song_list__get_name_for_item(song_index), 1);
-        xQueueSend(Q_songname, song_list__get_name_for_item(song_index), portMAX_DELAY);
-      } else if (current_state == moveup) {
-        lcd_print_string("Pick a song to play:", 0);
-        if (middle_button_is_pause_button) {
-          mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
-          middle_button_is_pause_button = false;
-        }
-        decrement_song_index();
-        print_3_songs_with_selector();
-      } else if (current_state == movedown) {
-        lcd_print_string("Pick a song to play:", 0);
-        if (middle_button_is_pause_button) {
-          mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
-          middle_button_is_pause_button = false;
-        }
-        increment_song_index();
-        print_3_songs_with_selector();
-      } else if (current_state == songpicker) {
-        lcd_clear();
-        lcd_print_string("Playing: ", 0);
-        lcd_print_string(song_list__get_name_for_item(song_index), 1);
-        xQueueSend(Q_songname, song_list__get_name_for_item(song_index), portMAX_DELAY);
-        mp3__gpio_attach_interrupt(middle_button, play_pause_ISR);
-        middle_button_is_pause_button = true;
-      }
+      if (current_state == paused)
+        pause_handler();
+      else if (current_state == next)
+        next_handler();
+      else if (current_state == previous)
+        previous_handler();
+      else if (current_state == moveup)
+        moveup_handler();
+      else if (current_state == movedown)
+        movedown_handler();
+      else if (current_state == songpicker)
+        songpicker_handler();
+      else if (current_state == volume)
+        volume_handler(); // not done
+
       current_state = idle;
     }
   }
@@ -238,14 +272,9 @@ int main(void) {
   Sem_mp3_control = xSemaphoreCreateBinary();
 
   interrupt_init();
-  mp3__gpio_attach_interrupt(up_button, move_up_list_ISR);
-  mp3__gpio_attach_interrupt(down_button, move_down_list_ISR);
-  mp3__gpio_attach_interrupt(middle_button, select_song_using_center_button_ISR);
-  mp3__gpio_attach_interrupt(right_button, play_next_ISR);
-  mp3__gpio_attach_interrupt(left_button, play_prev_ISR);
-  sj2_cli__init();
   mp3_decoder_init();
   lcd_init();
+  button_init();
   song_list__populate();
 
   lcd_print_string("Pick a song to play:", 0);
