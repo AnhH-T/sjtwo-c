@@ -137,6 +137,9 @@ static void lcd_print(uint8_t character) {
 }
 
 static void lcd_set_position(uint8_t cursor, uint8_t line) {
+  if (cursor > 19) {
+    cursor = 0;
+  }
   switch (line) {
   case 0:
     cursor += 0;
@@ -247,6 +250,11 @@ void lcd_init() {
 void lcd_print_string(const char *string, int line) {
   lcd_set_position(0, line);
   lcd_print_helper(string);
+}
+
+void lcd_print_single_char_at_cursor_position(const char character, int cursor, int line) {
+  lcd_set_position(cursor, line);
+  lcd_print(character);
 }
 
 // Song must be in the form Artist-Song Title

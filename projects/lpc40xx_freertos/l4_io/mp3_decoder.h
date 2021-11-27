@@ -45,3 +45,15 @@ uint16_t sj2_read_decoder(uint8_t address);
 uint16_t sj2_read_decoder_unprotected(uint8_t address);
 
 void sj2_send_music_data(char data);
+
+void mp3_increase_vol_by_10_percent();
+void mp3_decrease_vol_by_10_percent();
+uint8_t mp3_get_volume_percentage();
+
+void mp3_increase_treble();
+void mp3_decrease_treble();
+uint8_t mp3_get_treble();
+
+void mp3_increase_bass();
+void mp3_decrease_bass();
+uint8_t mp3_get_bass();

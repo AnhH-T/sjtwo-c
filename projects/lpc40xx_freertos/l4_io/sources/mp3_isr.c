@@ -1,7 +1,7 @@
 #include "mp3_isr.h"
 #include "lpc40xx.h"
 #include "lpc_peripherals.h"
-
+#include "semphr.h"
 // Note: You may want another separate array for falling vs. rising edge callbacks
 static function_pointer_t gpio0_callbacksR[32]; // Rising Edge
 static function_pointer_t gpio2_callbacksR[32]; // Rising Edge
@@ -48,3 +48,4 @@ void mp3__interrupt_dispatcher(void) {
   LPC_GPIOINT->IO0IntClr = 0xFFFFFFFF;
   LPC_GPIOINT->IO2IntClr = 0xFFFFFFFF;
 }
+
