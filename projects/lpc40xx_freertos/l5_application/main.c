@@ -115,10 +115,10 @@ void mp3_control(void *p) {
         movedown_music_select_handler();
         break;
       case moveup_menu_select:
-        moveup_menu_select_handler();
+        toggle_menu_select_handler();
         break;
       case movedown_menu_select:
-        movedown_menu_select_handler();
+        toggle_menu_select_handler();
         break;
       case songpicker:
         songpicker_handler();

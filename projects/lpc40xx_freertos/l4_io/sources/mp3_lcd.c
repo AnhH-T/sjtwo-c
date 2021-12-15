@@ -252,6 +252,11 @@ void lcd_print_string(const char *string, int line) {
   lcd_print_helper(string);
 }
 
+void lcd_print_string_at_cursor_position(const char *string, int cursor, int line) {
+  lcd_set_position(cursor, line);
+  lcd_print_helper(string);
+}
+
 void lcd_print_single_char_at_cursor_position(const char character, int cursor, int line) {
   lcd_set_position(cursor, line);
   lcd_print(character);

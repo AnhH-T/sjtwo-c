@@ -39,4 +39,5 @@ void lcd_print_arrow_on_right_side(int line);
 void lcd_clear_line(int line);
 void lcd_print_song_details_in_line_1_and_2(const char *string);
 void lcd_print_string(const char *string, int line);
+void lcd_print_string_at_cursor_position(const char *string, int cursor, int line);
 void lcd_print_single_char_at_cursor_position(const char character, int cursor, int line);

@@ -24,7 +24,7 @@ enum State {
   bass_control,
   treble_control
 };
-enum menu_option { change_song, change_volume, change_bass, change_treble };
+enum menu_option { change_song, settings };
 enum middle_button_current_function { middle_pause, middle_menu_select, middle_song_select, middle_set_options };
 
 // Function pointer type (demonstrated later in the code sample)
@@ -66,8 +66,7 @@ void next_handler();
 void previous_handler();
 void moveup_music_select_handler();
 void movedown_music_select_handler();
-void moveup_menu_select_handler();
-void movedown_menu_select_handler();
+void toggle_menu_select_handler();
 void songpicker_handler();
 void volume_handler();
 void bass_handler();

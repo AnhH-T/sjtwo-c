@@ -201,17 +201,12 @@ static void decrement_song_index() {
   }
   song_index--;
 }
-static void increment_menu_index() {
-  menu_index++;
-  if (menu_index > 3) {
-    menu_index = 0;
-  }
-}
-static void decrement_menu_index() {
+
+static void toggle_menu_index() {
   if (menu_index == 0) {
-    menu_index = 4;
-  }
-  menu_index--;
+    menu_index = 1;
+  } else
+    menu_index = 0;
 }
 
 void print_3_songs_with_selector() {
@@ -235,25 +230,17 @@ static const char *get_menu_option(int option) {
   char *menu_item = "";
   if (option == change_song)
     menu_item = "Select Song";
-  else if (option == change_volume)
-    menu_item = "Volume Control";
-  else if (option == change_bass)
-    menu_item = "Bass Control";
-  else if (option == change_treble)
-    menu_item = "Treble Control";
+  else if (option == settings)
+    menu_item = "Sound Settings";
 
   return menu_item;
 }
 
-static void print_menu_options_with_selector() {
-  decrement_menu_index();
+static void print_menu_options() {
   lcd_print_string(get_menu_option(menu_index), 1);
-  increment_menu_index();
+  toggle_menu_index();
   lcd_print_string(get_menu_option(menu_index), 2);
-  increment_menu_index();
-  lcd_print_string(get_menu_option(menu_index), 3);
-  decrement_menu_index();
-  lcd_print_arrow_on_right_side(2);
+  toggle_menu_index();
 }
 
 static void force_unpause() {
@@ -263,18 +250,25 @@ static void force_unpause() {
   }
 }
 
-static void print_volume_bar_to_lcd() {
-  uint8_t index = 5;
-  uint8_t volume_tenth_percentage = mp3_get_volume_percentage() / 10;
-  lcd_print_single_char_at_cursor_position('[', 4, 2);
-  while (index < 15) {
-    if (index < volume_tenth_percentage + 5)
-      lcd_print_single_char_at_cursor_position('=', index, 2);
-    else
-      lcd_print_single_char_at_cursor_position(' ', index, 2);
-    index++;
+static void print_volume_percentage_to_lcd() {
+  uint8_t volume_percentage = mp3_get_volume_percentage();
+  if (volume_percentage >= 100) {
+    lcd_print_single_char_at_cursor_position('1', 1, 2);
+    lcd_print_single_char_at_cursor_position('0', 2, 2);
+    lcd_print_single_char_at_cursor_position('0', 3, 2);
+  } else if (volume_percentage < 10) {
+    char number_str[4];
+    sprintf(number_str, "%d", volume_percentage);
+    lcd_print_single_char_at_cursor_position(' ', 1, 2);
+    lcd_print_single_char_at_cursor_position('0', 2, 2);
+    lcd_print_single_char_at_cursor_position(number_str[0], 3, 2);
+  } else {
+    char number_str[4];
+    sprintf(number_str, "%d", volume_percentage);
+    lcd_print_single_char_at_cursor_position(' ', 1, 2);
+    lcd_print_single_char_at_cursor_position(number_str[0], 2, 2);
+    lcd_print_single_char_at_cursor_position(number_str[1], 3, 2);
   }
-  lcd_print_single_char_at_cursor_position(']', 15, 2);
 }
 
 static void print_treble_bar_to_lcd() {
@@ -348,20 +342,24 @@ void movedown_music_select_handler() {
   print_3_songs_with_selector();
 }
 
-void moveup_menu_select_handler() {
-  lcd_print_string("Menu:", 0);
+void toggle_menu_select_handler() {
+  static int execute_once = 0;
+  if (!execute_once) {
+    lcd_print_string("Menu:", 0);
+    print_menu_options();
+    execute_once = 1;
+  }
   if (middle_button_function != middle_menu_select)
     change_middle_button_functionality(middle_menu_select);
-  decrement_menu_index();
-  print_menu_options_with_selector();
-}
-
-void movedown_menu_select_handler() {
-  lcd_print_string("Menu:", 0);
-  if (middle_button_function != middle_menu_select)
-    change_middle_button_functionality(middle_menu_select);
-  increment_menu_index();
-  print_menu_options_with_selector();
+  toggle_menu_index();
+  int cursor_line_index = menu_index + 1;
+  if (cursor_line_index == 1) {
+    lcd_print_single_char_at_cursor_position('<', 19, 1);
+    lcd_print_single_char_at_cursor_position(' ', 19, 2);
+  } else if (cursor_line_index == 2) {
+    lcd_print_single_char_at_cursor_position('<', 19, 2);
+    lcd_print_single_char_at_cursor_position(' ', 19, 1);
+  }
 }
 
 void songpicker_handler() {
@@ -373,7 +371,7 @@ void songpicker_handler() {
 
 void volume_handler() {
   attach_volume_control_interrupts();
-  print_volume_bar_to_lcd();
+  print_volume_percentage_to_lcd();
 }
 
 void bass_handler() {
@@ -388,11 +386,11 @@ void treble_handler() {
 
 void volume_increase_handler() {
   mp3_increase_vol_by_10_percent();
-  print_volume_bar_to_lcd();
+  print_volume_percentage_to_lcd();
 }
 void volume_decrease_handler() {
   mp3_decrease_vol_by_10_percent();
-  print_volume_bar_to_lcd();
+  print_volume_percentage_to_lcd();
 }
 void bass_increase_handler() {
   mp3_increase_bass();
@@ -423,15 +421,15 @@ void menupicker_handler() {
   if (menu_index == change_song) {
     attach_music_list_interrupts();
     moveup_music_select_handler();
-  } else if (menu_index == change_volume) {
-    lcd_print_string("Volume: ", 0);
+  } else if (menu_index == settings) {
+    lcd_print_string("Volume| Bass |Treble", 1);
+    // Prep next screen print layout
+    for (int i = 0; i < 4; i++) {
+      lcd_print_single_char_at_cursor_position('|', 6, i);
+      lcd_print_single_char_at_cursor_position('|', 13, i);
+    }
+    lcd_print_single_char_at_cursor_position('%', 4, 2);
     volume_handler();
-  } else if (menu_index == change_bass) {
-    lcd_print_string("Bass: ", 0);
-    bass_handler();
-  } else if (menu_index == change_treble) {
-    lcd_print_string("Treble: ", 0);
-    treble_handler();
   }
 
   if (middle_button_function != middle_song_select) {
