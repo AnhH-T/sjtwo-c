@@ -44,22 +44,28 @@ void mp3_decoder_init() {
 
   chip_deselect();
   data_deselect();
-  uint16_t MP3Status = sj2_read_decoder(SCI_STATUS);
-  int vsVersion = (MP3Status >> 4) & 0x000F; // four version bits
-  printf("VS1053 Ver %d\n", vsVersion);
+
+  // uint16_t MP3Status = sj2_read_decoder(SCI_STATUS);
+  // int vsVersion = (MP3Status >> 4) & 0x000F; // four version bits
+  // printf("VS1053 Ver %d\n", vsVersion);
+
+  delay__ms(200);
+  sj2_write_decoder(SCI_MODE, 0x4800);
   delay__ms(200);
 
-  uint16_t MP3Mode = sj2_read_decoder(SCI_MODE);
-  printf("SCI_MODE = 0x%x\n", MP3Mode);
-  delay__ms(100);
+  // uint16_t MP3Mode = sj2_read_decoder(SCI_MODE);
+  // printf("SCI_MODE = 0x%x\n", MP3Mode);
+  // delay__ms(100);
 
   sj2_write_decoder(SCI_VOL, 0x4B4B);
   volume = 0x4B;
   bass = 0x07;
   treble = 0x07;
-  uint16_t volumeRead = sj2_read_decoder(SCI_VOL);
-  printf("SCI_VOL = 0x%x\n", volumeRead);
-  delay__ms(200);
+
+  // uint16_t volumeRead = sj2_read_decoder(SCI_VOL);
+  // printf("SCI_VOL = 0x%x\n", volumeRead);
+  // delay__ms(200);
+
   sj2_write_decoder(SCI_CLOCKF, 0x6000);
 }
 
