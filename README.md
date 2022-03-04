@@ -1,3 +1,6 @@
+MP3 Project Demo Video by Anh Huynh:
+https://www.youtube.com/watch?v=AML2XmknipU
+
 # SJ2-C Development Environment
 
 An `SJ2` board is used at San Jose State University (SJSU) to teach Embedded Systems' courses. Part of this Git repository also includes development environment for not just an ARM controller, but also support to compile and test software on your host machine such as Windows, Mac etc.
